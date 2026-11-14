@@ -10,7 +10,7 @@ import { groupJobs } from "./jobs/sort";
 import type { Job, RawJob } from "./jobs/types";
 import { BudgetError, assertBudget, recordSpend } from "./llm/cost";
 import { searchWindow } from "./pipeline/find";
-import { hookOf, newNumbers } from "./resume/render";
+import { hookOf, hooksOf, newNumbers, resumeBody } from "./resume/render";
 import { countriesFrom } from "./sources/geo";
 import { nextStoryId, parseStories } from "./stories";
 import { toIcs } from "./tracker/ics";
@@ -75,12 +75,26 @@ describe("salary", () => {
   });
 
   it("hides only clearly lower, comparable salaries", () => {
-    const min = config.search.minSalary;
-    expect(isBelowMin({ min: 50000, max: 60000, currency: "EUR", period: "year" }, min, config.search.fx)).toBe(true);
-    expect(isBelowMin({ min: 70000, max: 90000, currency: "EUR", period: "year" }, min, config.search.fx)).toBe(false);
-    expect(isBelowMin({ min: 70000, max: 100000, currency: "USD", period: "year" }, min, config.search.fx)).toBe(false);
-    expect(isBelowMin({ min: 1, max: 2, currency: "XYZ", period: "year" }, min, config.search.fx)).toBe(false);
-    expect(isBelowMin(null, min, config.search.fx)).toBe(false);
+    const search = config.search;
+    expect(isBelowMin({ min: 50000, max: 60000, currency: "EUR", period: "year" }, ["DE"], search)).toBe(true);
+    expect(isBelowMin({ min: 70000, max: 90000, currency: "EUR", period: "year" }, ["DE"], search)).toBe(false);
+    expect(isBelowMin({ min: 70000, max: 100000, currency: "USD", period: "year" }, ["DE"], search)).toBe(false);
+    expect(isBelowMin({ min: 1, max: 2, currency: "XYZ", period: "year" }, ["DE"], search)).toBe(false);
+    expect(isBelowMin(null, ["DE"], search)).toBe(false);
+  });
+
+  it("uses the floor of the job's country, converted through fx", () => {
+    const search = {
+      ...config.search,
+      minSalary: { amount: 100000, currency: "EUR", period: "year" as const },
+      minSalaryByCountry: { US: { amount: 150000, currency: "USD", period: "year" as const } },
+      fxBase: "EUR",
+      fx: { USD: 0.9 },
+    };
+    const usd140k = { min: 120000, max: 140000, currency: "USD", period: "year" as const };
+    expect(isBelowMin(usd140k, ["US"], search)).toBe(true); // below $150k
+    expect(isBelowMin(usd140k, [], search)).toBe(false); // worldwide: 126k EUR >= 100k EUR
+    expect(isBelowMin({ min: 90000, max: 95000, currency: "EUR", period: "year" }, ["CZ"], search)).toBe(true);
   });
 });
 
@@ -88,6 +102,8 @@ describe("filters", () => {
   it("matches titles by tokens", () => {
     expect(titleMatches("Sr. Frontend Engineer, Payments", ["Senior Frontend Engineer"])).toBe(true);
     expect(titleMatches("Backend Engineer", ["Senior Frontend Engineer"])).toBe(false);
+    expect(titleMatches("Senior Front-End Engineer", ["Senior Frontend Engineer"])).toBe(true);
+    expect(titleMatches("Staff Engineer, Design System", ["Design Systems Engineer"])).toBe(true);
   });
 
   it("drops wrong countries but keeps unknown ones", () => {
@@ -152,6 +168,8 @@ describe("stories and fields", () => {
     expect(matchStandard("Full name")).toBe("fullName");
     expect(matchStandard("Name Pronunciation | How do you pronounce your name?")).toBeNull();
     expect(matchStandard("Please tell us how you heard about this opportunity.")).toBe("howDidYouHear");
+    expect(matchStandard("Will you require relocation assistance?")).toBe("relocationSupport");
+    expect(matchStandard("Are you willing to relocate to Austin, TX?")).toBe("relocation");
     expect(pickOption(["Yes", "No"], "No")).toBe("No");
     expect(pickOption(["Male", "Female", "I don't wish to answer"], "__DECLINE__")).toBe("I don't wish to answer");
   });
@@ -159,7 +177,19 @@ describe("stories and fields", () => {
 
 describe("resume checks", () => {
   const cv = fs.readFileSync("CV.example.md", "utf8");
-  it("finds the hook", () => expect(hookOf(cv)).toMatch(/^I turn slow/));
+  it("finds the hook and its variants", () => {
+    expect(hookOf(cv)).toMatch(/^I turn slow/);
+    expect(hooksOf(cv).map((h) => h.variant)).toEqual(["frontend-platform", "design-systems"]);
+  });
+  it("renders the template structure", () => {
+    const html = resumeBody(cv);
+    expect(html).toContain('<strong class="hook">I turn slow');
+    expect(html).not.toContain("design systems that 30+"); // extra hook variants are dropped
+    expect(html).toContain('<span class="org">Example Payments GmbH</span> — <span class="title">Senior Frontend Engineer</span><span class="when">2021 – present · Berlin</span>');
+    expect(html).toContain('<section class="sec-skills">');
+    expect(html).toContain("<strong>Languages</strong>"); // colon removed in skill labels
+    expect(html).toContain('<div class="header">');
+  });
   it("flags numbers that are not in the CV", () => {
     expect(newNumbers(cv, "Cut load time by 45% and grew revenue 300%")).toEqual(["300%"]);
   });

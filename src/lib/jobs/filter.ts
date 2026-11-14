@@ -4,7 +4,10 @@ import type { Job, RawJob } from "./types";
 
 /** Words that make a title match even if the configured title is phrased differently. */
 function titleTokens(title: string): string[] {
-  return normalizeTitle(title).split(" ").filter((t) => t.length > 1);
+  return normalizeTitle(title)
+    .split(" ")
+    .filter((t) => t.length > 1)
+    .map((t) => (t.length > 4 && t.endsWith("s") && !t.endsWith("ss") ? t.slice(0, -1) : t)); // "systems" = "system"
 }
 
 /** All significant tokens of at least one configured title appear in the job title. */

@@ -18,8 +18,10 @@ profile:                      # used to fill application forms - stays on your m
   website: ""
   noticePeriod: 3 months
   earliestStart: 2027-01-01
-  salaryExpectation: 85,000 EUR gross per year   # what to type when a form asks
+  salaryExpectation: ""        # leave empty to answer with the minimum for the job's country (e.g. "75,000+ EUR per year")
   howDidYouHear: Company careers page
+  willingToRelocate: true      # answers "Are you willing to relocate?"
+  needsRelocationSupport: false  # answers "Do you need relocation assistance?"
   eeo: decline                                   # decline | answer (voluntary diversity questions)
 
 # Work authorization per country (ISO 3166 alpha-2). Used for eligibility scoring and form answers.
@@ -41,8 +43,13 @@ search:
   seniority: [senior, lead]
   maxAgeDays: 30              # first run looks back this far; later runs start from the previous run
   minJobs: 100                # warn when a run finds fewer
-  minSalary: { amount: 75000, currency: EUR, period: year }
-  fx: { USD: 0.92, GBP: 1.17, CHF: 1.05 }   # 1 unit of X = n units of minSalary.currency
+  minSalary: { amount: 75000, currency: EUR, period: year }   # default floor (worldwide remote, unknown country)
+  minSalaryByCountry:                                        # optional per-country floors
+    US: { amount: 140000, currency: USD, period: year }
+  fxBase: EUR                                                # currency the rates below convert into
+  fx: { USD: 0.92, GBP: 1.17, CHF: 1.05 }                    # 1 unit of X = n units of fxBase (approximate)
+  preferences: >-                                            # free text the scorer takes into account
+    Full-time or contract-to-hire. Prefers hybrid in Berlin.
   targetCompanies:            # public ATS boards - most reliable source, add as many as you like
     - { name: Example Co, ats: greenhouse, slug: exampleco }
     # ats: greenhouse | lever | ashby | smartrecruiters  (slug = the company id in the board URL)

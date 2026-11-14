@@ -1,18 +1,26 @@
 import { parseSalaryText } from "../jobs/salary";
 import type { RawJob, Salary } from "../jobs/types";
 import { countriesFrom, workModeFrom } from "./geo";
-import { fetchJson } from "./http";
+import { HttpError, fetchJson } from "./http";
 import type { Source, SourceContext } from "./types";
 
 const iso = (v: string | number) => new Date(v).toISOString();
 const unix = (seconds: number) => new Date(seconds * 1000).toISOString();
 
+const pause = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+/** One search per configured title, spaced out; stops the source (keeping results) once it rate-limits us. */
 async function perTitle(ctx: SourceContext, name: string, fn: (title: string) => Promise<RawJob[]>): Promise<RawJob[]> {
   const out: RawJob[] = [];
-  for (const title of ctx.config.search.titles) {
+  for (const [i, title] of ctx.config.search.titles.entries()) {
+    if (i > 0) await pause(700);
     try {
       out.push(...(await fn(title)));
     } catch (e) {
+      if (e instanceof HttpError && e.status === 429) {
+        ctx.log(`  ${name}: rate-limited after ${i} of ${ctx.config.search.titles.length} titles, keeping ${out.length} results`);
+        break;
+      }
       ctx.log(`  ${name} "${title}": ${(e as Error).message}`);
     }
   }
@@ -77,6 +85,7 @@ export const himalayas: Source = {
       type J = { title: string; companyName: string; guid: string; applicationLink: string; pubDate: number; expiryDate: number; locationRestrictions: string[]; minSalary: number | null; maxSalary: number | null; currency: string | null; salaryPeriod: string; description: string };
       const out: RawJob[] = [];
       for (let page = 1; page <= 5; page++) {
+        if (page > 1) await pause(700);
         const d = await fetchJson<{ jobs: J[] }>(`https://himalayas.app/jobs/api/search?q=${encodeURIComponent(title)}&page=${page}`);
         for (const j of d.jobs) {
           if (unix(j.pubDate) < ctx.since.toISOString()) continue;
@@ -112,7 +121,9 @@ export const jobicy: Source = {
   name: "jobicy",
   async fetch(ctx) {
     type J = { id: number; url: string; jobTitle: string; companyName: string; jobGeo: string; jobDescription: string; pubDate: string; salaryMin?: number; salaryMax?: number; salaryCurrency?: string; salaryPeriod?: string };
-    const tags = ctx.config.search.keywords.length ? ctx.config.search.keywords : [""];
+    // Jobicy tags are single slugs; multi-word or symbol keywords ("CI/CD", "design system") return 400.
+    const single = ctx.config.search.keywords.filter((k) => /^[a-z0-9-]+$/i.test(k)).map((k) => k.toLowerCase());
+    const tags = single.length ? single : [""];
     const out: RawJob[] = [];
     for (const tag of tags) {
       try {

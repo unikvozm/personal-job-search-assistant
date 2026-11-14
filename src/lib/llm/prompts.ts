@@ -31,7 +31,10 @@ export function candidateFacts(config: Config): string {
     `Target seniority: ${config.search.seniority.join(", ") || "any"}`,
     `Wanted work modes: ${config.search.workModes.join(", ")}`,
     `Based in: ${config.profile.city}, ${config.profile.country}`,
-  ].join("\n");
+    config.search.preferences ? `Preferences and eligibility notes: ${config.search.preferences.trim()}` : "",
+  ]
+    .filter(Boolean)
+    .join("\n");
 }
 
 // ---------- Scoring ----------
@@ -71,6 +74,7 @@ Scoring rules:
 - Overall score: weighted judgement, roughly 30% experience, 30% skills, 15% qualifications, 15% responsibilities, 10% eligibility. If a hard requirement is unmet, set eligible=false and cap the score at 40.
 - Missing nice-to-haves lower the score a little; missing must-haves lower it a lot.
 - 85+ = strong match worth applying; 70-84 = reasonable; below 70 = weak.
+- Apply the candidate's preferences and eligibility notes: a job that conflicts with a stated hard limit (e.g. citizenship or clearance requirements, an excluded contract type) is not eligible; preferred locations or work modes raise the eligibility score.
 - Extract a salary only if the posting states one.
 Keep all text fields short.`;
 
@@ -112,20 +116,41 @@ export const TailorSchema = z.object({
   keywordsUsed: z.array(z.string()),
 });
 
-export const TAILOR_SYSTEM = `You tailor the candidate's CV (in <candidate>) to one job posting so it passes ATS screening and convinces a human recruiter.
+export const TAILOR_SYSTEM = `You tailor the candidate's master CV (in <candidate>) into a ONE-PAGE resume for one job posting. It must pass ATS screening and make a recruiter who scans it for 2 seconds want to interview the candidate.
 
 Hard rules - never break them:
-1. Do not invent anything: no new employers, titles, dates, degrees, tools, numbers or achievements. Every fact must come from the original CV.
-2. Keep the hook: the text between <!-- hook --> and <!-- /hook --> stays word for word (keep the markers). If there are no markers, keep the first sentence of the summary unchanged.
-3. Keep the header (name, contact line) unchanged.
-4. Keep the Markdown structure (headings, order of sections, bullet style).
+1. Do not invent anything: no new employers, titles, dates, degrees, tools, numbers or achievements. Every fact comes from the master CV.
+2. Hook: the master CV marks one or more hook sentences with <!-- hook --> or <!-- hook:variant -->. Use exactly ONE, copied word for word, as the first sentence of the Summary, wrapped as <!-- hook -->…<!-- /hook -->. Pick the variant that best matches this job's role family.
+3. Never inflate seniority: no Staff/Principal/Lead/Head title the CV doesn't show.
+4. Output exactly this Markdown structure (the renderer depends on it):
+   # Name
+   **Headline**\\
+   contact line exactly as in the master CV\\
+   **Work authorization** · relocation
+   ## Summary
+   (hook + 1-2 sentences)
+   ## Skills
+   - **Label:** comma-separated values
+   ## Experience
+   ### Company — Role | Dates · Location
+   *Product or scope line*
+   - **Outcome phrase:** how, with the numbers from the CV
+   ## Projects                (only if relevant to this job; at most 2 projects, 1 bullet each)
+   ### Project — Role | link
+   - **Outcome phrase:** what it does
+   ## Education
+   (degree line, certifications if relevant, and the Languages line unchanged)
 
-What to change:
-- Summary: after the hook, rewrite 1-3 sentences around what this job values most, using its vocabulary where the CV supports it.
-- Skills: reorder so the job's required skills come first; drop clearly irrelevant ones; never add a skill the CV doesn't show.
-- Experience: reorder and rephrase bullets so the most relevant come first; use the job's terminology for things the candidate actually did; keep every number exactly as in the original. You may drop weak, irrelevant bullets but keep every role.
-- Work in the given ATS keywords naturally, only where truthful. No keyword stuffing.
-- Keep it to roughly the original length (one to two pages).`;
+The 2-second scan - optimize the top third:
+- Headline: 4-7 terms that mirror the job's title and its top requirements, using only titles and skills the CV supports (e.g. "Senior Frontend Engineer | Frontend Platform · Design Systems · TypeScript").
+- Work authorization line: use the candidate facts for this job's country. US jobs: state the US work authorization. Jobs elsewhere: state relocation readiness and visa eligibility as given. Never claim an authorization the facts don't give.
+- Summary after the hook: 1-2 sentences naming the job's top 2-3 needs and the candidate's proof for each.
+
+One page - hard limits:
+- Skills: at most 6 rows, the job's required skills first, irrelevant ones dropped.
+- Most recent role: 5-6 bullets. The two roles before it: 2-3 bullets each. Older roles: 1 bullet each. Keep every employer (no gaps); earlier non-engineering career stays as one line.
+- Each bullet: max ~25 words, starts with a bold 2-5 word outcome phrase, numbers kept exactly as in the CV.
+- Order bullets by relevance to this job; use the job's terminology for things the candidate actually did; work ATS keywords in naturally, only where truthful.`;
 
 export function tailorPrompt(job: Job): string {
   const s = job.scoreResult;

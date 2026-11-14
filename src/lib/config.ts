@@ -28,6 +28,8 @@ export const ConfigSchema = z.object({
       earliestStart: z.coerce.string().default(""),
       salaryExpectation: z.string().default(""),
       howDidYouHear: z.string().default(""),
+      willingToRelocate: z.boolean().optional(),
+      needsRelocationSupport: z.boolean().optional(),
       eeo: z.enum(["decline", "answer"]).default("decline"),
     })
     .passthrough(),
@@ -46,8 +48,14 @@ export const ConfigSchema = z.object({
     seniority: z.array(z.string()).default([]),
     maxAgeDays: z.number().int().positive().default(30),
     minJobs: z.number().int().nonnegative().default(100),
+    /** Default floor: used for jobs whose country has no entry in minSalaryByCountry (e.g. worldwide remote). */
     minSalary: SalarySchema.optional(),
+    minSalaryByCountry: z.record(z.string().transform((s) => s.toUpperCase()), SalarySchema).default({}),
+    /** Currency the fx rates convert into; defaults to minSalary.currency. */
+    fxBase: z.string().length(3).transform((s) => s.toUpperCase()).optional(),
     fx: z.record(z.string(), z.number().positive()).default({}),
+    /** Free-text notes for the scorer: contract types, preferred regions, eligibility caveats. */
+    preferences: z.string().default(""),
     targetCompanies: z
       .array(z.object({ name: z.string(), ats: AtsSchema, slug: z.string() }))
       .default([]),

@@ -8,7 +8,7 @@ import { closeSharedBrowser } from "../apply/browser";
 import type { Job } from "../jobs/types";
 import { getBackend, guardBudget, type LlmTask } from "../llm";
 import { ensureDir, paths, slugify } from "../paths";
-import { hookOf, newNumbers, renderPdf } from "../resume/render";
+import { hooksOf, newNumbers, paperFor, renderPdf } from "../resume/render";
 import type { StepOptions } from "./score";
 import { answersTask, customQuestions, cvAndStories, tailorTask } from "./tasks";
 
@@ -70,16 +70,22 @@ export async function prepareApplications(config: Config, jobIds: string[], opts
     async function tailor(job: Job, cvText: string, cfg: Config, dir: string, logFn: (m: string) => void) {
       const out = await backend.run(tailorTask(job, cvText, cfg));
       const warnings: string[] = [];
-      const hook = hookOf(cvText);
-      if (hook && !out.markdown.includes(hook)) warnings.push("The hook sentence was changed - check the summary.");
+      const hooks = hooksOf(cvText);
+      if (hooks.length && !hooks.some((h) => out.markdown.includes(h.text))) warnings.push("The hook sentence was changed - check the summary.");
       const invented = newNumbers(cvText, out.markdown);
       if (invented.length) warnings.push(`Numbers not found in CV.md: ${invented.join(", ")} - verify or remove.`);
       fs.writeFileSync(path.join(dir, "resume.md"), out.markdown);
+      const rendered = await renderPdf(
+        out.markdown,
+        `${cfg.profile.firstName} ${cfg.profile.lastName} — ${job.title}`,
+        path.join(dir, "resume.pdf"),
+        paperFor(job.countries),
+      );
+      if (rendered.pages > 1) warnings.push(`The PDF is ${rendered.pages} pages even at ${Math.round(rendered.scale * 100)}% type size - trim bullets in resume.md and re-render.`);
       fs.writeFileSync(
         path.join(dir, "changes.md"),
         [`# Changes for ${job.title} — ${job.company}`, "", ...out.changes.map((c) => `- ${c}`), "", `Keywords: ${out.keywordsUsed.join(", ")}`, "", ...warnings.map((w) => `> ⚠️ ${w}`)].join("\n"),
       );
-      await renderPdf(out.markdown, `${cfg.profile.firstName} ${cfg.profile.lastName} — ${job.title}`, path.join(dir, "resume.pdf"));
       if (warnings.length) logFn(`    ⚠️ ${warnings.join(" ")}`);
     }
 

@@ -1,4 +1,5 @@
 import type { Config } from "../config";
+import { floorFor } from "../jobs/salary";
 import { countriesFrom } from "../sources/geo";
 import type { ApplicationQuestion, Job } from "../jobs/types";
 
@@ -10,6 +11,17 @@ const yesNo = (v: boolean) => (v ? "Yes" : "No");
 export function countryName(code: string): string {
   if (!/^[A-Z]{2}$/i.test(code)) return code;
   return new Intl.DisplayNames(["en"], { type: "region" }).of(code.toUpperCase()) ?? code;
+}
+
+/**
+ * Salary answer: profile.salaryExpectation when set, otherwise the minimum for the job's
+ * country ("150,000+ USD per year"), so US and EU forms get their own currency.
+ */
+function salaryAnswer(config: Config, job: Job): string | null {
+  if (config.profile.salaryExpectation) return config.profile.salaryExpectation;
+  const floor = floorFor(job.countries, config.search);
+  if (!floor) return null;
+  return `${floor.amount.toLocaleString("en-US")}+ ${floor.currency} per ${floor.period}`;
 }
 
 /** Country the question is about: named in the label, else the job's first country, else home country. */
@@ -42,7 +54,11 @@ const STANDARD: [string, RegExp, Resolver][] = [
   }],
   ["noticePeriod", /notice period/i, (c) => c.profile.noticePeriod || null],
   ["startDate", /start date|earliest start|available to start|availability/i, (c) => c.profile.earliestStart || null],
-  ["salary", /salary|compensation|pay expectation/i, (c) => c.profile.salaryExpectation || null],
+  ["salary", /salary|compensation|pay expectation/i, (c, j) => salaryAnswer(c, j)],
+  // "Do you need relocation assistance?" must be checked before the generic "willing to relocate?".
+  ["relocationSupport", /relocation (assistance|support|package|benefit)|require relocation|need relocation/i, (c) =>
+    c.profile.needsRelocationSupport == null ? null : yesNo(c.profile.needsRelocationSupport)],
+  ["relocation", /relocat/i, (c) => (c.profile.willingToRelocate == null ? null : yesNo(c.profile.willingToRelocate))],
   ["howDidYouHear", /how (did )?you (hear|heard|find|found)|referral source|^source$/i, (c) => c.profile.howDidYouHear || null],
   ["country", /^country\b|country (where )?you (currently )?(reside|live)|country of residence/i, (c) => countryName(c.profile.country) || null],
   ["location", /^(location|city|current (city|location))\b|where are you (based|located)|current address/i, (c) => [c.profile.city, countryName(c.profile.country)].filter(Boolean).join(", ") || null],

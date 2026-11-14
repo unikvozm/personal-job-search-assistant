@@ -1,28 +1,53 @@
-import type { SalarySpec } from "../config";
+import type { Config, SalarySpec } from "../config";
 import type { Salary } from "./types";
 
 const PERIOD_TO_YEAR = { year: 1, month: 12, hour: 2080 } as const;
 
 const SYMBOLS: Record<string, string> = { "€": "EUR", $: "USD", "£": "GBP", CHF: "CHF" };
 
-/** Yearly upper bound in the target currency, or null when not comparable. */
-export function yearlyIn(salary: Salary, currency: string, fx: Record<string, number>): number | null {
+type Search = Config["search"];
+
+const baseCurrency = (search: Search) => search.fxBase ?? search.minSalary?.currency ?? "EUR";
+
+/** Amount in the fx base currency, or null when the rate is unknown. */
+function toBase(amount: number, currency: string, search: Search): number | null {
+  if (currency === baseCurrency(search)) return amount;
+  const rate = search.fx[currency];
+  return rate == null ? null : amount * rate;
+}
+
+/** Yearly upper bound of a salary in the fx base currency, or null when not comparable. */
+export function yearlyInBase(salary: Salary, search: Search): number | null {
   const amount = salary.max ?? salary.min;
   if (amount == null) return null;
-  const rate = salary.currency === currency ? 1 : fx[salary.currency];
-  if (rate == null) return null;
-  return amount * PERIOD_TO_YEAR[salary.period] * rate;
+  return toBase(amount * PERIOD_TO_YEAR[salary.period], salary.currency, search);
+}
+
+function floorInBase(floor: SalarySpec, search: Search): number | null {
+  return toBase(floor.amount * PERIOD_TO_YEAR[floor.period], floor.currency, search);
 }
 
 /**
- * True only when the posting states a salary that is clearly below the minimum.
+ * The minimum salary that applies to a job: the lowest per-country floor among the job's
+ * countries, else the default `minSalary` (worldwide remote, unknown location).
+ */
+export function floorFor(countries: string[], search: Search): SalarySpec | undefined {
+  const specific = countries.flatMap((c) => (search.minSalaryByCountry[c] ? [search.minSalaryByCountry[c]] : []));
+  if (!specific.length) return search.minSalary;
+  return specific.reduce((low, f) => ((floorInBase(f, search) ?? Infinity) < (floorInBase(low, search) ?? Infinity) ? f : low));
+}
+
+/**
+ * True only when the posting states a salary that is clearly below the floor for its country.
  * Unknown currency or no salary → false (never hide what we can't compare).
  */
-export function isBelowMin(salary: Salary | null, min: SalarySpec | undefined, fx: Record<string, number>): boolean {
-  if (!salary || !min) return false;
-  const offered = yearlyIn(salary, min.currency, fx);
-  if (offered == null) return false;
-  return offered < min.amount * PERIOD_TO_YEAR[min.period];
+export function isBelowMin(salary: Salary | null, countries: string[], search: Search): boolean {
+  const floor = floorFor(countries, search);
+  if (!salary || !floor) return false;
+  const offered = yearlyInBase(salary, search);
+  const min = floorInBase(floor, search);
+  if (offered == null || min == null) return false;
+  return offered < min;
 }
 
 const NUM = String.raw`(\d{1,3}(?:[.,\s]\d{3})+|\d+(?:[.,]\d+)?)\s*(k)?`;

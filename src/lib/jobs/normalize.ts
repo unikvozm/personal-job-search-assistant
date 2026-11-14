@@ -37,6 +37,8 @@ export function normalizeTitle(title: string): string {
   return title
     .toLowerCase()
     .replace(/\((m|f|w|d|x|all genders?)[/|,\s\w]*\)/g, "") // German "(m/w/d)" style suffixes
+    .replace(/\bfront[\s-]?end\b/g, "frontend")
+    .replace(/\bback[\s-]?end\b/g, "backend")
     .replace(/\b(sr)\b\.?/g, "senior")
     .replace(/\b(jr)\b\.?/g, "junior")
     .replace(/[^a-z0-9]+/g, " ")

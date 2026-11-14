@@ -57,7 +57,7 @@ export async function scoreJobs(config: Config, opts: StepOptions = {}) {
         continue;
       }
       const salary = job.salary ?? r.salary;
-      const belowMinSalary = isBelowMin(salary, config.search.minSalary, config.search.fx);
+      const belowMinSalary = isBelowMin(salary, job.countries, config.search);
       const status: JobStatus = !r.eligible ? "ineligible" : r.score <= threshold ? "below_threshold" : "scored";
       jobsRepo.saveScore(job.id, {
         status,
