@@ -225,3 +225,23 @@ describe("regressions from the first live run", () => {
     expect(htmlToText("<ul><li><p>React</p></li></ul>")).toBe("- React");
   });
 });
+
+describe("run bookkeeping", () => {
+  beforeEach(() => resetDb(":memory:"));
+  it("marks runs whose process is gone as interrupted", async () => {
+    const { runsRepo, db } = await import("./db");
+    const live = runsRepo.start("find");
+    const dead = runsRepo.start("score");
+    db().prepare("UPDATE runs SET pid = 999999 WHERE id = ?").run(dead.id); // no such process
+    const runs = runsRepo.recent();
+    expect(runs.find((r) => r.id === live.id)!.status).toBe("running"); // this test process is alive
+    expect(runs.find((r) => r.id === dead.id)!.status).toBe("failed");
+  });
+  it("stops a run", async () => {
+    const { runsRepo, db } = await import("./db");
+    const run = runsRepo.start("find");
+    db().prepare("UPDATE runs SET pid = NULL WHERE id = ?").run(run.id); // don't signal the test process
+    runsRepo.stop(run.id);
+    expect(runsRepo.recent()[0]!.error).toMatch(/Interrupted|Stopped/);
+  });
+});

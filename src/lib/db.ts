@@ -44,7 +44,8 @@ CREATE TABLE IF NOT EXISTS runs (
   finished_at TEXT,
   window_from TEXT,
   stats TEXT,
-  error TEXT
+  error TEXT,
+  pid INTEGER
 );
 
 CREATE TABLE IF NOT EXISTS applications (
@@ -105,7 +106,14 @@ export function db(file = paths.db): DatabaseSync {
   instance = new DatabaseSync(file);
   instance.exec("PRAGMA journal_mode = WAL; PRAGMA foreign_keys = ON;");
   instance.exec(SCHEMA);
+  migrate(instance);
   return instance;
+}
+
+/** Additive migrations for databases created by older versions. */
+function migrate(d: DatabaseSync) {
+  const runColumns = (d.prepare("PRAGMA table_info(runs)").all() as Row[]).map((c) => c.name);
+  if (!runColumns.includes("pid")) d.exec("ALTER TABLE runs ADD COLUMN pid INTEGER");
 }
 
 /** For tests: swap in a fresh in-memory database. */
@@ -249,9 +257,25 @@ export const runsRepo = {
       error: null,
     };
     db()
-      .prepare("INSERT INTO runs (id, kind, status, started_at, window_from) VALUES (?,?,?,?,?)")
-      .run(run.id, kind, run.status, run.startedAt, windowFrom);
+      .prepare("INSERT INTO runs (id, kind, status, started_at, window_from, pid) VALUES (?,?,?,?,?,?)")
+      .run(run.id, kind, run.status, run.startedAt, windowFrom, process.pid);
     return run;
+  },
+  /** Marks "running" runs whose process is gone (crash, killed, dev server restart) as interrupted. */
+  reapStale() {
+    const rows = db().prepare("SELECT id, pid FROM runs WHERE status = 'running'").all() as Row[];
+    for (const r of rows) {
+      if (r.pid == null || !isAlive(r.pid as number)) {
+        this.fail(r.id as string, "Interrupted: the run's process ended before it finished. Start it again.");
+      }
+    }
+  },
+  /** Stops a running run: ends its process and marks it failed. */
+  stop(id: string) {
+    const r = db().prepare("SELECT pid, status FROM runs WHERE id = ?").get(id) as Row | undefined;
+    if (!r || r.status !== "running") return;
+    if (r.pid != null && isAlive(r.pid as number)) process.kill(r.pid as number, "SIGTERM");
+    this.fail(id, "Stopped by you.");
   },
   finish(id: string, stats: Record<string, unknown>) {
     db().prepare("UPDATE runs SET status = 'done', finished_at = ?, stats = ? WHERE id = ?").run(now(), json(stats), id);
@@ -266,9 +290,19 @@ export const runsRepo = {
     return r ? rowToRun(r) : null;
   },
   recent(limit = 10): Run[] {
+    this.reapStale();
     return (db().prepare("SELECT * FROM runs ORDER BY started_at DESC LIMIT ?").all(limit) as Row[]).map(rowToRun);
   },
 };
+
+function isAlive(pid: number): boolean {
+  try {
+    process.kill(pid, 0); // signal 0 only checks that the process exists
+    return true;
+  } catch (e) {
+    return (e as NodeJS.ErrnoException).code === "EPERM";
+  }
+}
 
 export type ApplicationStatus =
   | "preparing"

@@ -40,6 +40,13 @@ export function RunPanel({ initialRuns, newJobs }: { initialRuns: Run[]; newJobs
     }
   }
 
+  async function stop(id: string) {
+    if (!confirm("Stop this run? Results saved so far are kept.")) return;
+    await post("/api/runs", { kind: "stop", id }).catch((e) => setError((e as Error).message));
+    setRuns((await (await fetch("/api/runs")).json()).runs);
+    router.refresh();
+  }
+
   const last = runs[0];
   const budgetFailure = last?.status === "failed" && /budget/i.test(last.error ?? "");
 
@@ -69,6 +76,12 @@ export function RunPanel({ initialRuns, newJobs }: { initialRuns: Run[]; newJobs
             <div key={r.id}>
               {LABELS[r.kind] ?? r.kind} · {new Date(r.startedAt).toLocaleString()} ·{" "}
               <span className={r.status === "failed" ? "error" : r.status === "done" ? "good" : ""}>{r.status}</span>
+              {r.status === "running" && r.id !== "pending" && (
+                <>
+                  {" "}
+                  <button className="small danger" onClick={() => stop(r.id)}>Stop</button>
+                </>
+              )}
               {r.stats && ` · ${Object.entries(r.stats).filter(([, v]) => typeof v === "number").map(([k, v]) => `${k}: ${v}`).join(", ")}`}
               {r.status === "failed" && !budgetFailure && r.error && ` · ${r.error}`}
               {Array.isArray(r.stats?.warnings) && (r.stats.warnings as string[]).map((w) => <div key={w} className="warn">⚠️ {w}</div>)}
