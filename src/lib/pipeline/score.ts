@@ -69,6 +69,11 @@ export async function scoreJobs(config: Config, opts: StepOptions = {}) {
       });
       if (status === "scored" && !belowMinSalary) good.push({ ...job, score: r.score, scoreResult: r, salary });
     }
+    if (failed === jobs.length) {
+      // Nothing scored (e.g. no API key, claude CLI missing): report it as a failed run, not "done".
+      const first = [...results.values()].find((r) => r instanceof Error) as Error | undefined;
+      throw new Error(`All ${failed} jobs failed to score: ${first?.message ?? "no results"}`);
+    }
     log(`${good.length} jobs above ${threshold}. Reading their application forms…`);
     await classifyQuestions(config, good, opts);
     const stats = { scored: jobs.length - failed, failed, aboveThreshold: good.length };
