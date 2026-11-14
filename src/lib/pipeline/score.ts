@@ -16,12 +16,17 @@ import { z } from "zod";
 export interface StepOptions {
   allowOverBudget?: boolean;
   log?: (m: string) => void;
+  /** Score only these jobs (e.g. the ones you just added); default: every unscored job. */
+  ids?: string[];
 }
+
+/** The Batch API is 50% cheaper but takes minutes; for a handful of jobs direct calls are worth it. */
+const BATCH_MIN = 10;
 
 /** Step 2 - score every unscored job against the CV, then classify application questions for the good ones. */
 export async function scoreJobs(config: Config, opts: StepOptions = {}) {
   const log = opts.log ?? console.log;
-  const jobs = jobsRepo.byStatus("new");
+  const jobs = opts.ids?.length ? jobsRepo.byIds(opts.ids).filter((j) => j.status === "new") : jobsRepo.byStatus("new");
   if (!jobs.length) {
     log("No new jobs to score.");
     return { scored: 0 };
@@ -41,7 +46,7 @@ export async function scoreJobs(config: Config, opts: StepOptions = {}) {
       maxTokens: 4000,
       effort: "low",
     }));
-    const batch = backend.name === "api" && config.llm.useBatch;
+    const batch = backend.name === "api" && config.llm.useBatch && tasks.length >= BATCH_MIN;
     const usd = guardBudget(config, tasks, batch, opts.allowOverBudget);
     log(`Scoring ${jobs.length} jobs with ${backend.name}${batch ? " (batch)" : ""}${usd ? `, est. $${usd.toFixed(2)}` : ""}`);
 
@@ -95,7 +100,8 @@ export async function classifyQuestions(config: Config, jobs: Job[], opts: StepO
   const log = opts.log ?? console.log;
   const withQuestions = await pMap(jobs, 3, async (job) => {
     try {
-      return { job, questions: await fetchQuestions(job) };
+      // Questions you pasted with a job are kept; otherwise read them from the application form.
+      return { job, questions: job.questions?.length ? job.questions : await fetchQuestions(job) };
     } catch (e) {
       log(`  ${job.company}: could not read form (${(e as Error).message.split("\n")[0]})`);
       return { job, questions: null };
@@ -117,7 +123,7 @@ export async function classifyQuestions(config: Config, jobs: Job[], opts: StepO
     effort: "low",
   }));
   const backend = getBackend(config);
-  const batch = backend.name === "api" && config.llm.useBatch;
+  const batch = backend.name === "api" && config.llm.useBatch && tasks.length >= BATCH_MIN;
   if (tasks.length) guardBudget(config, tasks, batch, opts.allowOverBudget);
   const results: TaskResults<z.infer<typeof ClassifySchema>> = tasks.length
     ? await backend.runMany(tasks, { batch, onProgress: log })

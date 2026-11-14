@@ -27,7 +27,7 @@ export function TrackerTable({ rows, today }: { rows: TrackerRow[]; today: strin
     router.refresh();
   };
 
-  if (!rows.length) return <p className="muted">No applications yet.</p>;
+  if (!rows.length) return <p className="muted">No applications yet. Applications appear here once submitted, or when you mark a job as applied.</p>;
   return (
     <div className="scroll">
       <table className="table">

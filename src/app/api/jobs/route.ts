@@ -1,9 +1,9 @@
-import { jobsRepo } from "@/lib/db";
-import { json, rejectCrossSite } from "@/lib/server";
+import { applicationsRepo, jobsRepo } from "@/lib/db";
+import { json, rejectCrossSite, tryConfig } from "@/lib/server";
 
 export const dynamic = "force-dynamic";
 
-/** Bulk list actions. Body: { ids, action: select | deselect | skip | hide | restore } */
+/** Bulk list actions. Body: { ids, action: select | deselect | skip | hide | restore | applied } */
 export async function POST(req: Request) {
   const blocked = rejectCrossSite(req);
   if (blocked) return blocked;
@@ -17,6 +17,10 @@ export async function POST(req: Request) {
     case "hide":
       jobsRepo.setStatus(ids, action === "skip" ? "skipped" : "hidden");
       jobsRepo.setSelected(ids, false);
+      break;
+    case "applied":
+      // Applied outside the app (LinkedIn, email, ...): record it so the job moves to the Applied tab.
+      applicationsRepo.markApplied(ids, tryConfig().config?.tracker.followUpDays ?? 7);
       break;
     case "restore":
       jobsRepo.setStatus(ids, "scored");

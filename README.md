@@ -39,7 +39,8 @@ pnpm dev     # http://127.0.0.1:3417 (this machine only; another port: PORT=4000
 3. **Apply to selected** shows the cost estimate, then tailors resumes, writes answers and prefills forms. Nothing is submitted yet.
 4. **Review**: check each prefilled form, resume and answers; <kbd>A</kbd> approves (a browser window fills and submits; you handle any CAPTCHA), <kbd>S</kbd> skips. Forms that can't be filled automatically get copy buttons and *I submitted it*.
 5. **Stories**: answer the open questions; a STAR draft is generated and added to your story bank after you approve it.
-6. **Tracker**: update statuses, follow-up and interview dates; export to your calendar; open **Prep** for interview questions and practice.
+6. **Add jobs**: paste links (Greenhouse, Lever, Ashby and SmartRecruiters are read with their application questions; other career sites from the page) or paste a description and questions for jobs you found yourself. They are scored right away and can be applied to like any other job; tick "I already applied" to record past applications.
+7. **Applied**: every submitted application (or job you marked as applied); update statuses, follow-up and interview dates, export to your calendar, open **Prep** for interview questions and practice.
 
 Everything is also available from the CLI (`pnpm jobs help`) and as Claude Code skills in `.claude/skills` (`/find-jobs`, `/score-jobs`, `/tailor-resume`, `/application-answers`, `/apply`, `/interview-prep`).
 

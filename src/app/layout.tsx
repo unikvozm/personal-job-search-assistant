@@ -26,13 +26,14 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <nav>
           <span className="brand">Job Search Assistant</span>
           <Link href="/">Jobs</Link>
+          <Link href="/add">Add jobs</Link>
           <Link href="/review">
             Review{c.review > 0 && <span className="badge">{c.review}</span>}
           </Link>
           <Link href="/stories">
             Stories{c.stories > 0 && <span className="badge">{c.stories}</span>}
           </Link>
-          <Link href="/tracker">Tracker</Link>
+          <Link href="/applied">Applied</Link>
           <Link href="/settings">Settings</Link>
         </nav>
         <main>{children}</main>

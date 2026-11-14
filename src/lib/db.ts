@@ -168,14 +168,15 @@ export const jobsRepo = {
       .prepare(
         `INSERT INTO jobs (id, fingerprint, source, source_id, company, title, location, countries, work_mode, url,
           apply_url, description, posted_at, salary, salary_source, ats, ats_ref, first_party, status,
-          first_seen_run, first_seen_at, last_seen_at, live)
-         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+          first_seen_run, first_seen_at, last_seen_at, live, questions)
+         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
       )
       .run(
         job.id, job.fingerprint, job.source, job.sourceId, job.company, job.title, job.location,
         json(job.countries), job.workMode, job.url, job.applyUrl ?? null, job.description, job.postedAt,
         json(job.salary), job.salarySource, job.ats ?? null, json(job.atsRef), job.firstParty ? 1 : 0,
         job.status, job.firstSeenRun, job.firstSeenAt, job.firstSeenAt, job.live == null ? null : Number(job.live),
+        json(job.questions),
       );
   },
   touch(fingerprint: string) {
@@ -188,6 +189,17 @@ export const jobsRepo = {
   get(id: string): Job | null {
     const r = db().prepare("SELECT * FROM jobs WHERE id = ?").get(id) as Row | undefined;
     return r ? rowToJob(r) : null;
+  },
+  byFingerprint(fingerprint: string): Job | null {
+    const r = db().prepare("SELECT * FROM jobs WHERE fingerprint = ?").get(fingerprint) as Row | undefined;
+    return r ? rowToJob(r) : null;
+  },
+  /** Jobs you added yourself (links or pasted), newest first. */
+  bySources(sources: readonly string[]): Job[] {
+    const marks = sources.map(() => "?").join(",");
+    return (
+      db().prepare(`SELECT * FROM jobs WHERE source IN (${marks}) ORDER BY first_seen_at DESC`).all(...sources) as Row[]
+    ).map(rowToJob);
   },
   byStatus(...statuses: JobStatus[]): Job[] {
     const marks = statuses.map(() => "?").join(",");
@@ -304,6 +316,9 @@ function isAlive(pid: number): boolean {
   }
 }
 
+/** Application statuses that count as "applied" (shown on the Applied tab). */
+export const APPLIED_STATUSES = ["submitted", "submit_unconfirmed", "interview", "offer", "rejected", "withdrawn"] as const;
+
 export type ApplicationStatus =
   | "preparing"
   | "needs_input"
@@ -402,6 +417,20 @@ export const applicationsRepo = {
   },
   all(): Application[] {
     return (db().prepare("SELECT * FROM applications ORDER BY updated_at DESC").all() as Row[]).map(rowToApplication);
+  },
+  /** Records jobs as applied (e.g. applied outside the app): submitted now, follow-up scheduled. */
+  markApplied(jobIds: string[], followUpDays: number) {
+    for (const jobId of jobIds) {
+      const app = this.byJob(jobId) ?? this.upsert(jobId, "submitted");
+      const at = now();
+      this.update(app.id, {
+        status: "submitted",
+        submittedAt: app.submittedAt ?? at,
+        followUpAt: app.followUpAt ?? new Date(Date.now() + followUpDays * 86_400_000).toISOString(),
+      });
+      jobsRepo.setStatus([jobId], "applied");
+      jobsRepo.setSelected([jobId], false);
+    }
   },
   /** Submitted applications for the same company + normalized title (duplicate guard). */
   submittedDuplicates(company: string, title: string, excludeJobId: string): Application[] {

@@ -15,6 +15,7 @@ export interface JobView {
   salaryEstimated: boolean;
   postedAt: string;
   source: string;
+  addedByYou: boolean;
   /** null = not scored yet */
   score: number | null;
   summary: string;
@@ -38,6 +39,8 @@ interface Group {
 }
 
 interface Props {
+  /** false hides the list filters (e.g. on the Add jobs page). */
+  filters?: boolean;
   groups: Group[];
   unscored: JobView[];
   threshold: number;
@@ -75,9 +78,10 @@ export function JobList(props: Props) {
     await post("/api/jobs", { ids: [id], action: on ? "select" : "deselect" }).catch(() => {});
   }
 
-  async function bulk(action: "skip" | "hide" | "restore") {
+  async function bulk(action: "skip" | "hide" | "restore" | "applied") {
     const ids = [...selected];
     if (!ids.length) return;
+    if (action === "applied" && !confirm(`Record ${ids.length} job(s) as applied? They move to the Applied tab.`)) return;
     await post("/api/jobs", { ids, action });
     setSelected(new Set());
     router.refresh();
@@ -123,8 +127,11 @@ export function JobList(props: Props) {
         </button>
         <button disabled={!selected.size} onClick={() => bulk("skip")}>Skip</button>
         <button disabled={!selected.size} onClick={() => bulk("hide")}>Hide</button>
+        <button disabled={!selected.size} onClick={() => bulk("applied")} title="You applied outside this app">Mark as applied</button>
         {props.showHidden && <button disabled={!selected.size} onClick={() => bulk("restore")}>Restore</button>}
         <span className="spacer" />
+        {props.filters !== false && (
+          <>
         <label className="small">
           Posted{" "}
           <select value={props.posted ? String(props.posted) : ""} onChange={(e) => setParam("posted", e.target.value || null)}>
@@ -140,6 +147,8 @@ export function JobList(props: Props) {
         <label className="small">
           <input type="checkbox" checked={props.showHidden} onChange={(e) => setParam("hidden", e.target.checked ? "1" : null)} /> Hidden / skipped ({props.hiddenCount})
         </label>
+          </>
+        )}
       </div>
       {message && <p className="warn">{message}</p>}
 
@@ -169,7 +178,7 @@ export function JobList(props: Props) {
           <h2>
             Not scored yet <span className="muted small">({props.unscored.length})</span>
           </h2>
-          <p className="muted small">Found but not scored. Use “Score unscored” above; they then move into the lists above.</p>
+          <p className="muted small">Not scored yet. Scoring runs automatically for jobs you add; for search results use “Score unscored” on the Jobs page.</p>
           <div className="list">{props.unscored.map((j) => <Row key={j.id} job={j} {...rowProps} />)}</div>
         </section>
       )}
@@ -194,7 +203,8 @@ function Row({ job, threshold, selected, onToggle }: { job: JobView; threshold: 
       </span>
       <div>
         <div className="title">
-          <a href={job.url} target="_blank" rel="noreferrer">{job.title}</a> <span className="muted">· {job.company}</span>
+          {/^https?:/.test(job.url) ? <a href={job.url} target="_blank" rel="noreferrer">{job.title}</a> : job.title}{" "}
+          <span className="muted">· {job.company}</span>
         </div>
         <div className="small muted">
           {job.location} {job.postedAt && `· ${job.postedAt}`} · {job.source}
@@ -220,6 +230,7 @@ function Row({ job, threshold, selected, onToggle }: { job: JobView; threshold: 
         {job.salary && <div>{job.salary}{job.salaryEstimated && <span className="muted" title="Extracted from the description"> *</span>}</div>}
         {job.belowMinSalary && <span className="chip">below min</span>}
         {job.status === "ineligible" && <span className="chip">ineligible</span>}
+        {job.addedByYou && <span className="chip">added by you</span>}
         {job.application && <span className="chip">{job.application.replace("_", " ")}</span>}
         {job.status === "hidden" || job.status === "skipped" ? <span className="chip">{job.status}</span> : null}
       </div>

@@ -22,7 +22,7 @@ const days = daysFlag ? Number(daysFlag.slice("--days=".length)) || undefined : 
 const HELP = `Usage: pnpm jobs <command>
 
   find                 Fetch, filter, dedupe and store new postings (no LLM) → data/runs/<date>/jobDescriptions.md
-  score                Score new jobs against CV.md and classify their application questions
+  score [jobId…]       Score unscored jobs (all, or just these) against CV.md and classify their questions
   daily                find + score
   prepare <jobId…>     Tailor resume + write answers (or --selected for all ticked jobs)
   prefill [appId…]     Fill forms headlessly and screenshot them for review (default: all "ready")
@@ -44,7 +44,7 @@ async function main() {
       break;
     }
     case "score":
-      console.log(await scoreJobs(config, { allowOverBudget }));
+      console.log(await scoreJobs(config, { allowOverBudget, ids: args }));
       break;
     case "daily": {
       const r = await findJobs(config, console.log, { days });

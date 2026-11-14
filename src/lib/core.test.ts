@@ -260,3 +260,47 @@ describe("run bookkeeping", () => {
     expect(runsRepo.recent()[0]!.error).toMatch(/Interrupted|Stopped/);
   });
 });
+
+describe("adding jobs yourself", () => {
+  it("recognizes ATS links", async () => {
+    const { parseAtsLink } = await import("./sources/ats");
+    expect(parseAtsLink("https://job-boards.greenhouse.io/stripe/jobs/123?gh_src=x")).toEqual({ ats: "greenhouse", slug: "stripe", id: "123" });
+    expect(parseAtsLink("https://boards.greenhouse.io/gitlab/jobs/456")).toMatchObject({ ats: "greenhouse", slug: "gitlab" });
+    expect(parseAtsLink("https://jobs.eu.lever.co/acme/abc-def/apply")).toEqual({ ats: "lever", slug: "acme", id: "abc-def" });
+    expect(parseAtsLink("https://jobs.ashbyhq.com/notion/uuid-1/application")).toEqual({ ats: "ashby", slug: "notion", id: "uuid-1" });
+    expect(parseAtsLink("https://jobs.smartrecruiters.com/BoschGroup/744000-senior-engineer")).toEqual({ ats: "smartrecruiters", slug: "BoschGroup", id: "744000" });
+    expect(parseAtsLink("https://careers.example.com/job/1")).toBeNull();
+  });
+
+  it("reads a JobPosting from JSON-LD, including @graph", async () => {
+    const { jobPostingFromHtml } = await import("./sources/manual");
+    const html = `<script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization"},{"@type":"JobPosting","title":"Staff Frontend Engineer","hiringOrganization":{"name":"Acme"},"jobLocation":{"address":{"addressLocality":"Austin","addressRegion":"TX","addressCountry":"US"}}}]}</script>`;
+    expect(jobPostingFromHtml(html)).toMatchObject({ title: "Staff Frontend Engineer", hiringOrganization: { name: "Acme" } });
+    expect(jobPostingFromHtml("<html>no data</html>")).toBeNull();
+  });
+
+  it("parses pasted questions", async () => {
+    const { parseQuestions } = await import("./sources/manual");
+    const qs = parseQuestions("1. Why do you want to work here? *\n- Your LinkedIn profile\n\nDescribe a project you led (required)");
+    expect(qs.map((q) => [q.label, q.required, q.standardKey ?? null])).toEqual([
+      ["Why do you want to work here?", true, null],
+      ["Your LinkedIn profile", false, "linkedin"],
+      ["Describe a project you led", true, null],
+    ]);
+  });
+
+  it("stores a pasted job with its questions and can record it as applied", async () => {
+    resetDb(":memory:");
+    const { addJobs } = await import("./pipeline/add");
+    const { jobsRepo, applicationsRepo } = await import("./db");
+    const pasted = { company: "Acme", title: "Design Systems Engineer", location: "Austin, TX", description: "x".repeat(200), questions: "Why Acme? *" };
+    const [first] = await addJobs(config, { pasted });
+    expect(first!.ok).toBe(true);
+    expect(first!.existing).toBeFalsy();
+    expect(jobsRepo.get(first!.jobId!)!.questions![0]!.label).toBe("Why Acme?");
+    const [again] = await addJobs(config, { pasted, alreadyApplied: true });
+    expect(again!.existing).toBe(true);
+    expect(jobsRepo.get(first!.jobId!)!.status).toBe("applied");
+    expect(applicationsRepo.byJob(first!.jobId!)!.submittedAt).not.toBeNull();
+  });
+});

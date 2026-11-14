@@ -1,48 +1,16 @@
-import { applicationsRepo, jobsRepo, runsRepo } from "@/lib/db";
+import { jobsRepo, runsRepo } from "@/lib/db";
 import { groupJobs, postedWithin } from "@/lib/jobs/sort";
-import { formatSalary } from "@/lib/jobs/salary";
-import type { Job } from "@/lib/jobs/types";
 import { llmMode } from "@/lib/llm";
 import { spentToday } from "@/lib/llm/cost";
 import { tryConfig } from "@/lib/server";
-import { JobList, type JobView } from "./components/JobList";
+import { JobList } from "./components/JobList";
+import { toView } from "@/lib/jobView";
 import { RunPanel } from "./components/RunPanel";
 import { SetupNotice } from "./components/SetupNotice";
 
 export const dynamic = "force-dynamic";
 
 const POSTED_DAYS = [1, 3, 7, 14, 30];
-
-function toView(j: Job): JobView {
-  return {
-    id: j.id,
-    title: j.title,
-    company: j.company,
-    location: [j.location, j.workMode].filter(Boolean).join(" · "),
-    url: j.url,
-    salary: formatSalary(j.salary),
-    salaryEstimated: j.salarySource === "llm",
-    postedAt: j.postedAt?.slice(0, 10) ?? "",
-    source: j.source,
-    score: j.score,
-    summary: j.scoreResult?.summary ?? "",
-    matched: j.scoreResult?.matched ?? [],
-    gaps: j.scoreResult?.gaps ?? [],
-    eligibilityNote: j.status === "ineligible" ? j.scoreResult?.eligibilityNotes || "Not eligible" : "",
-    selected: j.selected,
-    status: j.status,
-    autoFillable: j.autoFillable === true,
-    needsInput:
-      j.score == null || j.status === "below_threshold" || j.status === "ineligible"
-        ? []
-        : j.questions == null
-          ? ["Application form could not be read automatically"]
-          : j.questions.filter((q) => q.required && !q.answerable).map((q) => q.label),
-    unverifiedLink: j.live === null,
-    belowMinSalary: j.belowMinSalary,
-    application: applicationsRepo.byJob(j.id)?.status ?? null,
-  };
-}
 
 export default async function JobsPage({ searchParams }: { searchParams: Promise<Record<string, string | undefined>> }) {
   const { config, error } = tryConfig();

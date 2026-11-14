@@ -1,4 +1,4 @@
-import { applicationsRepo, jobsRepo, now, type Application } from "@/lib/db";
+import { APPLIED_STATUSES, applicationsRepo, jobsRepo, now, type Application } from "@/lib/db";
 import { json, startCli, tryConfig, rejectCrossSite } from "@/lib/server";
 
 export const dynamic = "force-dynamic";
@@ -42,9 +42,16 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
       applicationsRepo.update(id, { status: "skipped" });
       jobsRepo.setStatus([app.jobId], "skipped");
       break;
-    case "update":
+    case "update": {
       applicationsRepo.update(id, body.patch);
+      const status = body.patch.status;
+      if (status && (APPLIED_STATUSES as readonly string[]).includes(status)) {
+        // Keep the job on the Applied tab and give it a submission date if it had none.
+        jobsRepo.setStatus([app.jobId], "applied");
+        if (!app.submittedAt) applicationsRepo.update(id, { submittedAt: now(), followUpAt: new Date(Date.now() + followUpDays * 86_400_000).toISOString() });
+      }
       break;
+    }
     default:
       return json({ error: "Unknown action" }, 400);
   }
