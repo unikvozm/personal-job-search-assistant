@@ -9,7 +9,7 @@ Submissions always need the user's approval per application. Never submit on you
 
 1. Run `pnpm jobs apply <jobId…>` (or select jobs in the UI and click "Apply to selected"). This tailors the resume, writes answers, checks for earlier submissions to the same company and title, and prefills supported forms (Greenhouse, Lever, Ashby) headlessly with a screenshot. Nothing is submitted.
 2. Report: prefilled, needs manual, needs input, skipped as duplicate.
-3. Send the user to http://localhost:3000/review. There they approve each application (A) or skip it (S). Approving opens a visible browser that fills the form again and submits; CAPTCHAs are left to the user.
-4. Questions that need the user's input appear on http://localhost:3000/stories.
+3. Send the user to http://127.0.0.1:3417/review. There they approve each application (A) or skip it (S). Approving opens a visible browser that fills the form again and submits; CAPTCHAs are left to the user.
+4. Questions that need the user's input appear on http://127.0.0.1:3417/stories.
 
 Do not drive the browser yourself for submissions, do not solve CAPTCHAs, and do not automate LinkedIn or Indeed.

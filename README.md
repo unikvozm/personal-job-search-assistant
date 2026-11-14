@@ -29,7 +29,7 @@ pnpm exec playwright install chromium    # PDFs, form reading, prefill
 4. **.env.local**: `ANTHROPIC_API_KEY` for API mode; optionally a free [Adzuna](https://developer.adzuna.com) key for national job boards.
 
 ```bash
-pnpm dev     # http://localhost:3000 (bound to 127.0.0.1 only)
+pnpm dev     # http://127.0.0.1:3417 (this machine only; another port: PORT=4000 pnpm dev)
 ```
 
 ## Daily use
