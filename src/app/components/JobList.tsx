@@ -15,10 +15,12 @@ export interface JobView {
   salaryEstimated: boolean;
   postedAt: string;
   source: string;
-  score: number;
+  /** null = not scored yet */
+  score: number | null;
   summary: string;
   matched: string[];
   gaps: string[];
+  eligibilityNote: string;
   selected: boolean;
   status: string;
   autoFillable: boolean;
@@ -35,7 +37,29 @@ interface Group {
   needsInput: JobView[];
 }
 
-export function JobList(props: { groups: Group[]; showBelowMin: boolean; showHidden: boolean; belowMinCount: number; hiddenCount: number }) {
+interface Props {
+  groups: Group[];
+  unscored: JobView[];
+  threshold: number;
+  posted: number | null;
+  showBelowMin: boolean;
+  showHidden: boolean;
+  showLowScores: boolean;
+  belowMinCount: number;
+  hiddenCount: number;
+  lowCount: number;
+}
+
+const POSTED_OPTIONS: [string, string][] = [
+  ["", "Any time"],
+  ["1", "Last 24 hours"],
+  ["3", "Last 3 days"],
+  ["7", "Last 7 days"],
+  ["14", "Last 14 days"],
+  ["30", "Last 30 days"],
+];
+
+export function JobList(props: Props) {
   const router = useRouter();
   const all = useMemo(() => props.groups.flatMap((g) => [...g.ready, ...g.needsInput]), [props.groups]);
   const [selected, setSelected] = useState(() => new Set(all.filter((j) => j.selected && !j.application).map((j) => j.id)));
@@ -81,12 +105,15 @@ export function JobList(props: { groups: Group[]; showBelowMin: boolean; showHid
     }
   }
 
-  const toggleParam = (key: string, on: boolean) => {
+  /** Updates one URL filter; null removes it. */
+  const setParam = (key: string, value: string | null) => {
     const url = new URL(window.location.href);
-    if (on) url.searchParams.set(key, "1");
+    if (value) url.searchParams.set(key, value);
     else url.searchParams.delete(key);
     router.push(url.pathname + url.search);
   };
+
+  const rowProps = { threshold: props.threshold, selected, onToggle: toggle };
 
   return (
     <>
@@ -99,10 +126,19 @@ export function JobList(props: { groups: Group[]; showBelowMin: boolean; showHid
         {props.showHidden && <button disabled={!selected.size} onClick={() => bulk("restore")}>Restore</button>}
         <span className="spacer" />
         <label className="small">
-          <input type="checkbox" checked={props.showBelowMin} onChange={(e) => toggleParam("belowMin", e.target.checked)} /> Below min salary ({props.belowMinCount})
+          Posted{" "}
+          <select value={props.posted ? String(props.posted) : ""} onChange={(e) => setParam("posted", e.target.value || null)}>
+            {POSTED_OPTIONS.map(([v, label]) => <option key={v} value={v}>{label}</option>)}
+          </select>
         </label>
         <label className="small">
-          <input type="checkbox" checked={props.showHidden} onChange={(e) => toggleParam("hidden", e.target.checked)} /> Hidden / skipped ({props.hiddenCount})
+          <input type="checkbox" checked={!props.showLowScores} onChange={(e) => setParam("low", e.target.checked ? null : "1")} /> Hide score &lt; {props.threshold} ({props.lowCount})
+        </label>
+        <label className="small">
+          <input type="checkbox" checked={props.showBelowMin} onChange={(e) => setParam("belowMin", e.target.checked ? "1" : null)} /> Below min salary ({props.belowMinCount})
+        </label>
+        <label className="small">
+          <input type="checkbox" checked={props.showHidden} onChange={(e) => setParam("hidden", e.target.checked ? "1" : null)} /> Hidden / skipped ({props.hiddenCount})
         </label>
       </div>
       {message && <p className="warn">{message}</p>}
@@ -112,31 +148,50 @@ export function JobList(props: { groups: Group[]; showBelowMin: boolean; showHid
           <h2>
             {g.title} <span className="muted small">({g.ready.length + g.needsInput.length})</span>
           </h2>
-          {g.ready.length + g.needsInput.length === 0 && <p className="muted">Nothing here yet.</p>}
+          {g.ready.length + g.needsInput.length === 0 && <p className="muted">Nothing here for these filters.</p>}
           {g.ready.length > 0 && (
             <>
               <h3>Ready to auto-fill</h3>
-              <div className="list">{g.ready.map((j) => <Row key={j.id} job={j} checked={selected.has(j.id)} onToggle={toggle} />)}</div>
+              <div className="list">{g.ready.map((j) => <Row key={j.id} job={j} {...rowProps} />)}</div>
             </>
           )}
           {g.needsInput.length > 0 && (
             <>
               <h3>Needs your input</h3>
-              <div className="list">{g.needsInput.map((j) => <Row key={j.id} job={j} checked={selected.has(j.id)} onToggle={toggle} />)}</div>
+              <div className="list">{g.needsInput.map((j) => <Row key={j.id} job={j} {...rowProps} />)}</div>
             </>
           )}
         </section>
       ))}
+
+      {props.unscored.length > 0 && (
+        <section>
+          <h2>
+            Not scored yet <span className="muted small">({props.unscored.length})</span>
+          </h2>
+          <p className="muted small">Found but not scored. Use “Score unscored” above; they then move into the lists above.</p>
+          <div className="list">{props.unscored.map((j) => <Row key={j.id} job={j} {...rowProps} />)}</div>
+        </section>
+      )}
     </>
   );
 }
 
-function Row({ job, checked, onToggle }: { job: JobView; checked: boolean; onToggle: (id: string) => void }) {
-  const tone = job.score >= 85 ? "high" : job.score >= 75 ? "mid" : "";
+function Row({ job, threshold, selected, onToggle }: { job: JobView; threshold: number; selected: Set<string>; onToggle: (id: string) => void }) {
+  const scored = job.score != null;
+  const tone = !scored ? "" : job.score! >= 85 ? "high" : job.score! >= 75 ? "mid" : job.score! <= threshold ? "low" : "";
   return (
     <div className="job">
-      <input type="checkbox" checked={checked} disabled={!!job.application} onChange={() => onToggle(job.id)} aria-label={`Select ${job.title}`} />
-      <span className={`score ${tone}`}>{job.score}</span>
+      <input
+        type="checkbox"
+        checked={selected.has(job.id)}
+        disabled={!!job.application || !scored}
+        onChange={() => onToggle(job.id)}
+        aria-label={`Select ${job.title}`}
+      />
+      <span className={`score ${tone}`} title={scored ? `Match score ${job.score}/100` : "Not scored yet"}>
+        {scored ? job.score : "—"}
+      </span>
       <div>
         <div className="title">
           <a href={job.url} target="_blank" rel="noreferrer">{job.title}</a> <span className="muted">· {job.company}</span>
@@ -145,22 +200,26 @@ function Row({ job, checked, onToggle }: { job: JobView; checked: boolean; onTog
           {job.location} {job.postedAt && `· ${job.postedAt}`} · {job.source}
           {job.unverifiedLink && " · link not verified"}
         </div>
-        <div className="small">{job.summary}</div>
-        {!job.autoFillable && job.needsInput.length > 0 && (
+        {job.summary && <div className="small">{job.summary}</div>}
+        {job.eligibilityNote && <div className="small error">Not eligible: {job.eligibilityNote}</div>}
+        {scored && !job.autoFillable && job.needsInput.length > 0 && (
           <div className="small warn">Needs input: {job.needsInput.slice(0, 3).join("; ")}{job.needsInput.length > 3 && ` +${job.needsInput.length - 3}`}</div>
         )}
-        <details>
-          <summary>Fit details</summary>
-          <div className="small">
-            <div className="good">✓ {job.matched.join(" · ")}</div>
-            <div className="warn">✗ {job.gaps.join(" · ") || "no gaps found"}</div>
-            <Link href={`/prep/${job.id}`}>Interview prep →</Link>
-          </div>
-        </details>
+        {scored && (
+          <details>
+            <summary>Fit details</summary>
+            <div className="small">
+              <div className="good">✓ {job.matched.join(" · ")}</div>
+              <div className="warn">✗ {job.gaps.join(" · ") || "no gaps found"}</div>
+              <Link href={`/prep/${job.id}`}>Interview prep →</Link>
+            </div>
+          </details>
+        )}
       </div>
       <div className="meta small" style={{ textAlign: "right" }}>
         {job.salary && <div>{job.salary}{job.salaryEstimated && <span className="muted" title="Extracted from the description"> *</span>}</div>}
         {job.belowMinSalary && <span className="chip">below min</span>}
+        {job.status === "ineligible" && <span className="chip">ineligible</span>}
         {job.application && <span className="chip">{job.application.replace("_", " ")}</span>}
         {job.status === "hidden" || job.status === "skipped" ? <span className="chip">{job.status}</span> : null}
       </div>

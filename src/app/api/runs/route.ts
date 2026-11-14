@@ -16,11 +16,12 @@ const COMMANDS = new Set(["daily", "find", "score", "apply", "prepare", "prefill
 export async function POST(req: Request) {
   const blocked = rejectCrossSite(req);
   if (blocked) return blocked;
-  const { kind, id, ids = [], allowOverBudget = false } = (await req.json()) as {
+  const { kind, id, ids = [], allowOverBudget = false, days } = (await req.json()) as {
     kind: string;
     id?: string;
     ids?: string[];
     allowOverBudget?: boolean;
+    days?: number;
   };
   if (kind === "stop" && id) {
     runsRepo.stop(id);
@@ -31,6 +32,7 @@ export async function POST(req: Request) {
   if (runsRepo.recent(5).some((r) => r.status === "running")) {
     return json({ error: "Another run is still in progress" }, 409);
   }
-  const log = startCli([kind, ...ids.map(String), ...(allowOverBudget ? ["--allow-over-budget"] : [])]);
+  const daysFlag = Number.isInteger(days) && days! > 0 && days! <= 90 ? [`--days=${days}`] : [];
+  const log = startCli([kind, ...ids.map(String), ...(allowOverBudget ? ["--allow-over-budget"] : []), ...daysFlag]);
   return json({ started: kind, log });
 }

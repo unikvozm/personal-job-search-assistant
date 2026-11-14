@@ -18,6 +18,8 @@ export function RunPanel({ initialRuns, newJobs }: { initialRuns: Run[]; newJobs
   const router = useRouter();
   const [runs, setRuns] = useState(initialRuns);
   const [error, setError] = useState<string | null>(null);
+  /** "" = since the last run; otherwise postings from the last N days. */
+  const [days, setDays] = useState("");
   const running = runs.some((r) => r.status === "running");
 
   useEffect(() => {
@@ -33,7 +35,7 @@ export function RunPanel({ initialRuns, newJobs }: { initialRuns: Run[]; newJobs
   async function start(kind: string, allowOverBudget = false) {
     setError(null);
     try {
-      await post("/api/runs", { kind, allowOverBudget });
+      await post("/api/runs", { kind, allowOverBudget, days: days ? Number(days) : undefined });
       setRuns([{ id: "pending", kind: "find", status: "running", startedAt: new Date().toISOString(), finishedAt: null, windowFrom: null, stats: null, error: null }, ...runs]);
     } catch (e) {
       setError((e as Error).message);
@@ -56,6 +58,16 @@ export function RunPanel({ initialRuns, newJobs }: { initialRuns: Run[]; newJobs
         <button className="primary" disabled={running} onClick={() => start("daily")}>
           {running ? "Running…" : "Find & score new jobs"}
         </button>
+        <label className="small">
+          posted{" "}
+          <select value={days} disabled={running} onChange={(e) => setDays(e.target.value)}>
+            <option value="">since the last run</option>
+            <option value="1">in the last 24 hours</option>
+            <option value="7">in the last 7 days</option>
+            <option value="14">in the last 14 days</option>
+            <option value="30">in the last 30 days</option>
+          </select>
+        </label>
         {newJobs > 0 && (
           <button disabled={running} onClick={() => start("score")}>
             Score {newJobs} unscored

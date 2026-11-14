@@ -82,6 +82,7 @@ textarea { width: 100%; min-height: 90px; resize: vertical; }
 .score { display: inline-block; width: 38px; text-align: center; font-weight: 700; border-radius: 6px; padding: 2px 0; background: var(--chip); }
 .score.high { color: var(--good); }
 .score.mid { color: var(--warn); }
+.score.low { color: var(--muted); }
 
 .table { width: 100%; border-collapse: collapse; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
 .table th, .table td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--border); vertical-align: top; }

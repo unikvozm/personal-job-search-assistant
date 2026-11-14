@@ -15,6 +15,9 @@ const [command = "help", ...rest] = process.argv.slice(2);
 const flags = new Set(rest.filter((a) => a.startsWith("--")));
 const args = rest.filter((a) => !a.startsWith("--"));
 const allowOverBudget = flags.has("--allow-over-budget");
+/** --days=30 → search postings from the last 30 days instead of "since the last run". */
+const daysFlag = [...flags].find((f) => f.startsWith("--days="));
+const days = daysFlag ? Number(daysFlag.slice("--days=".length)) || undefined : undefined;
 
 const HELP = `Usage: pnpm jobs <command>
 
@@ -27,14 +30,15 @@ const HELP = `Usage: pnpm jobs <command>
   prep <jobId>         Generate interview questions and practice material
   status               Counts and today's API spend
 
-Flags: --allow-over-budget  run even if the estimate exceeds llm.dailyBudgetUsd`;
+Flags: --allow-over-budget  run even if the estimate exceeds llm.dailyBudgetUsd
+       --days=N             find/daily: postings from the last N days instead of since the last run`;
 
 async function main() {
   if (command === "help") return console.log(HELP);
   const config = loadConfig();
   switch (command) {
     case "find": {
-      const r = await findJobs(config);
+      const r = await findJobs(config, console.log, { days });
       console.log(r.stats, `\n→ ${r.file}`);
       r.warnings.forEach((w) => console.warn(`⚠️ ${w}`));
       break;
@@ -43,8 +47,13 @@ async function main() {
       console.log(await scoreJobs(config, { allowOverBudget }));
       break;
     case "daily": {
-      const r = await findJobs(config);
+      const r = await findJobs(config, console.log, { days });
       r.warnings.forEach((w) => console.warn(`⚠️ ${w}`));
+      if (r.stats.new === 0) {
+        // Nothing new: don't start a scoring batch. Older unscored jobs are scored via "score".
+        console.log("No new jobs found - scoring skipped.");
+        break;
+      }
       console.log(await scoreJobs(config, { allowOverBudget }));
       break;
     }

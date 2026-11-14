@@ -6,7 +6,7 @@ import { resetDb } from "./db";
 import { prefilter, titleMatches } from "./jobs/filter";
 import { dedupe, fingerprint, htmlToText, toJob } from "./jobs/normalize";
 import { isBelowMin, parseSalaryText } from "./jobs/salary";
-import { groupJobs } from "./jobs/sort";
+import { groupJobs, postedWithin } from "./jobs/sort";
 import type { Job, RawJob } from "./jobs/types";
 import { BudgetError, assertBudget, recordSpend } from "./llm/cost";
 import { searchWindow } from "./pipeline/find";
@@ -134,6 +134,21 @@ describe("list order", () => {
     expect(withSalary!.ready.map((j) => j.id)).toEqual(["d", "c"]);
     expect(withSalary!.needsInput.map((j) => j.id)).toEqual(["b"]);
     expect(without!.ready.map((j) => j.id)).toEqual(["a"]);
+  });
+});
+
+describe("list filters", () => {
+  it("shows low scores only when asked", () => {
+    const jobs = [job({ id: "hi", score: 80, autoFillable: true }), job({ id: "lo", score: 40, autoFillable: false })];
+    const ids = (show: boolean) => groupJobs(jobs, { threshold: 70, showLowScores: show }).flatMap((g) => [...g.ready, ...g.needsInput]).map((j) => j.id);
+    expect(ids(false)).toEqual(["hi"]);
+    expect(ids(true)).toEqual(["hi", "lo"]);
+  });
+  it("filters by posting date and keeps undated jobs", () => {
+    const now = Date.parse("2026-11-14T12:00:00Z");
+    const jobs = [job({ id: "new", postedAt: "2026-11-13T00:00:00Z" }), job({ id: "old", postedAt: "2026-10-01T00:00:00Z" }), job({ id: "undated", postedAt: null })];
+    expect(postedWithin(jobs, 7, now).map((j) => j.id)).toEqual(["new", "undated"]);
+    expect(postedWithin(jobs, null, now)).toHaveLength(3);
   });
 });
 

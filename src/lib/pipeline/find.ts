@@ -25,9 +25,14 @@ export interface FindResult {
   warnings: string[];
 }
 
-/** Step 1 - no LLM: fetch, filter, dedupe, check links, store, write jobDescriptions.md. */
-export async function findJobs(config: Config, log: (m: string) => void = console.log): Promise<FindResult> {
-  const since = searchWindow(config, runsRepo.lastSuccessful("find")?.startedAt ?? null);
+/**
+ * Step 1 - no LLM: fetch, filter, dedupe, check links, store, write jobDescriptions.md.
+ * `days` overrides the incremental window ("postings from the last N days").
+ */
+export async function findJobs(config: Config, log: (m: string) => void = console.log, opts: { days?: number } = {}): Promise<FindResult> {
+  const since = opts.days
+    ? new Date(Date.now() - opts.days * 86_400_000)
+    : searchWindow(config, runsRepo.lastSuccessful("find")?.startedAt ?? null);
   const run = runsRepo.start("find", since.toISOString());
   try {
     const sources = selectSources(config);
