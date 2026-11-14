@@ -1,0 +1,17 @@
+# Personal data - never commit
+CV.md
+interviewBankStories.md
+configs.md
+.env
+.env.*
+!.env.example
+data/
+personal/
+
+# Build / deps
+node_modules/
+.next/
+next-env.d.ts
+*.tsbuildinfo
+coverage/
+.DS_Store

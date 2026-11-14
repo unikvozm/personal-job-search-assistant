@@ -1,0 +1,96 @@
+import fs from "node:fs";
+import { prefill, submit } from "../src/lib/apply/prefill";
+import { loadConfig } from "../src/lib/config";
+import { applicationsRepo, jobsRepo } from "../src/lib/db";
+import { BudgetError, spentToday } from "../src/lib/llm/cost";
+import { llmMode } from "../src/lib/llm";
+import { findJobs } from "../src/lib/pipeline/find";
+import { generatePrep } from "../src/lib/pipeline/prep";
+import { prepareApplications } from "../src/lib/pipeline/prepare";
+import { scoreJobs } from "../src/lib/pipeline/score";
+
+if (fs.existsSync(".env.local")) process.loadEnvFile(".env.local");
+
+const [command = "help", ...rest] = process.argv.slice(2);
+const flags = new Set(rest.filter((a) => a.startsWith("--")));
+const args = rest.filter((a) => !a.startsWith("--"));
+const allowOverBudget = flags.has("--allow-over-budget");
+
+const HELP = `Usage: pnpm jobs <command>
+
+  find                 Fetch, filter, dedupe and store new postings (no LLM) → data/runs/<date>/jobDescriptions.md
+  score                Score new jobs against CV.md and classify their application questions
+  daily                find + score
+  prepare <jobId…>     Tailor resume + write answers (or --selected for all ticked jobs)
+  prefill [appId…]     Fill forms headlessly and screenshot them for review (default: all "ready")
+  submit <appId>       Submit ONE approved application in a visible browser
+  prep <jobId>         Generate interview questions and practice material
+  status               Counts and today's API spend
+
+Flags: --allow-over-budget  run even if the estimate exceeds llm.dailyBudgetUsd`;
+
+async function main() {
+  if (command === "help") return console.log(HELP);
+  const config = loadConfig();
+  switch (command) {
+    case "find": {
+      const r = await findJobs(config);
+      console.log(r.stats, `\n→ ${r.file}`);
+      r.warnings.forEach((w) => console.warn(`⚠️ ${w}`));
+      break;
+    }
+    case "score":
+      console.log(await scoreJobs(config, { allowOverBudget }));
+      break;
+    case "daily": {
+      const r = await findJobs(config);
+      r.warnings.forEach((w) => console.warn(`⚠️ ${w}`));
+      console.log(await scoreJobs(config, { allowOverBudget }));
+      break;
+    }
+    case "prepare": {
+      const ids = flags.has("--selected") ? jobsRepo.byStatus("scored").filter((j) => j.selected).map((j) => j.id) : args;
+      if (!ids.length) throw new Error("Pass job ids or --selected");
+      console.log(await prepareApplications(config, ids, { allowOverBudget }));
+      break;
+    }
+    case "apply": {
+      // "Apply to selected" in the UI: prepare, then prefill everything that became ready.
+      if (!args.length) throw new Error("Pass job ids");
+      console.log(await prepareApplications(config, args, { allowOverBudget }));
+      const ready = args.map((id) => applicationsRepo.byJob(id)).filter((a) => a?.status === "ready").map((a) => a!.id);
+      if (ready.length) console.log(await prefill(config, ready));
+      break;
+    }
+    case "prefill":
+      console.log(await prefill(config, args.map(Number)));
+      break;
+    case "submit":
+      if (!args[0]) throw new Error("Pass an application id");
+      await submit(config, Number(args[0]));
+      break;
+    case "prep":
+      if (!args[0]) throw new Error("Pass a job id");
+      console.log(JSON.stringify(await generatePrep(config, args[0], { allowOverBudget }), null, 2));
+      break;
+    case "status": {
+      const count = (s: Parameters<typeof jobsRepo.byStatus>[0]) => jobsRepo.byStatus(s).length;
+      console.log({
+        llmMode: llmMode(config),
+        spentTodayUsd: Number(spentToday().toFixed(3)),
+        budgetUsd: config.llm.dailyBudgetUsd,
+        jobs: { new: count("new"), scored: count("scored"), applying: count("applying"), applied: count("applied") },
+        reviewQueue: applicationsRepo.byStatus("prefilled", "needs_manual").length,
+      });
+      break;
+    }
+    default:
+      console.log(HELP);
+      process.exitCode = 1;
+  }
+}
+
+main().catch((e) => {
+  console.error(e instanceof BudgetError ? `💸 ${e.message}` : `✖ ${(e as Error).message}`);
+  process.exitCode = e instanceof BudgetError ? 3 : 1;
+});
