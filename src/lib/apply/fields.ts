@@ -26,7 +26,7 @@ const STANDARD: [string, RegExp, Resolver][] = [
   ["coverLetter", /cover letter/i, () => null],
   ["firstName", /\b(first|given|preferred first) name\b/i, (c) => c.profile.firstName],
   ["lastName", /\b(last|family|sur) ?name\b/i, (c) => c.profile.lastName],
-  ["fullName", /^(full )?name\b/i, (c) => `${c.profile.firstName} ${c.profile.lastName}`],
+  ["fullName", /^(your )?(full |legal )?name\s*$/i,(c) => `${c.profile.firstName} ${c.profile.lastName}`],
   ["email", /e-?mail/i, (c) => c.profile.email],
   ["phone", /phone|mobile/i, (c) => c.profile.phone || null],
   ["linkedin", /linkedin/i, (c) => c.profile.linkedin || null],
@@ -43,10 +43,10 @@ const STANDARD: [string, RegExp, Resolver][] = [
   ["noticePeriod", /notice period/i, (c) => c.profile.noticePeriod || null],
   ["startDate", /start date|earliest start|available to start|availability/i, (c) => c.profile.earliestStart || null],
   ["salary", /salary|compensation|pay expectation/i, (c) => c.profile.salaryExpectation || null],
-  ["howDidYouHear", /how did you (hear|find)|referral source|^source$/i, (c) => c.profile.howDidYouHear || null],
+  ["howDidYouHear", /how (did )?you (hear|heard|find|found)|referral source|^source$/i, (c) => c.profile.howDidYouHear || null],
   ["country", /^country\b|country (where )?you (currently )?(reside|live)|country of residence/i, (c) => countryName(c.profile.country) || null],
   ["location", /^(location|city|current (city|location))\b|where are you (based|located)|current address/i, (c) => [c.profile.city, countryName(c.profile.country)].filter(Boolean).join(", ") || null],
-  ["eeo", /gender|race|ethnic|veteran|disability|pronoun|sexual orientation|hispanic/i, (c) => (c.profile.eeo === "decline" ? "__DECLINE__" : null)],
+  ["eeo", /\b(gender|race|ethnicity|ethnic|veteran|disability|pronouns?|sexual orientation|hispanic)\b/i, (c) => (c.profile.eeo === "decline" ? "__DECLINE__" : null)],
 ];
 
 export function matchStandard(label: string): string | null {

@@ -149,6 +149,9 @@ describe("stories and fields", () => {
     expect(matchStandard("Please select the country where you currently reside.")).toBe("country");
     expect(matchStandard("If this role offers the option to work from a remote location, do you plan to?")).toBeNull();
     expect(matchStandard("Location")).toBe("location");
+    expect(matchStandard("Full name")).toBe("fullName");
+    expect(matchStandard("Name Pronunciation | How do you pronounce your name?")).toBeNull();
+    expect(matchStandard("Please tell us how you heard about this opportunity.")).toBe("howDidYouHear");
     expect(pickOption(["Yes", "No"], "No")).toBe("No");
     expect(pickOption(["Male", "Female", "I don't wish to answer"], "__DECLINE__")).toBe("I don't wish to answer");
   });
