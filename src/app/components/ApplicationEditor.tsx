@@ -29,11 +29,17 @@ interface Props {
   } | null;
   questions: EditorQuestion[];
   formKnown: boolean;
+  /** "tailored", "family:<name>" or null. */
+  resumeSource: string | null;
+  /** Custom questions without an answer yet. */
+  remaining: number;
+  /** Estimated USD for "Write answers" (null = unknown, 0 = Claude plan). */
+  answersCost: number | null;
 }
 
 const words = (s: string) => s.trim().split(/\s+/).filter(Boolean).length;
 
-export function ApplicationEditor({ jobId, application: app, questions, formKnown }: Props) {
+export function ApplicationEditor({ jobId, application: app, questions, formKnown, resumeSource, remaining, answersCost }: Props) {
   const router = useRouter();
   const [answers, setAnswers] = useState<Record<string, string>>(app?.answers ?? {});
   const [edited, setEdited] = useState<Set<string>>(new Set());
@@ -84,16 +90,20 @@ export function ApplicationEditor({ jobId, application: app, questions, formKnow
     }
   }
 
-  async function prepareAgain() {
-    if (!confirm("Write the answers again from your CV and story bank? Answers you edited here are replaced (ones you saved to the story bank are reused).")) return;
+  /** Starts a background step for this job: apply (prepare again), answers or tailor. */
+  async function start(kind: "apply" | "answers" | "tailor", confirmText?: string) {
+    if (confirmText && !confirm(confirmText)) return;
     setMessage(null);
     try {
-      await post("/api/runs", { kind: "apply", ids: [jobId] });
+      await post("/api/runs", { kind, ids: [jobId] });
       router.refresh();
     } catch (e) {
       setMessage((e as Error).message);
     }
   }
+
+  const copy = (text: string) => navigator.clipboard.writeText(text).then(() => setMessage("Copied."));
+  const family = resumeSource?.startsWith("family:") ? resumeSource.slice("family:".length) : null;
 
   if (!app) {
     return <p className="muted">You haven&apos;t started applying to this job. Select it on the Jobs page and click “Apply to selected”.</p>;
@@ -108,9 +118,31 @@ export function ApplicationEditor({ jobId, application: app, questions, formKnow
         {app.resumePdf && <a className="button" href={fileUrl(app.resumePdf)} target="_blank" rel="noreferrer">Resume PDF</a>}
         <a className="button" href={app.formUrl} target="_blank" rel="noreferrer">Application form</a>
         {(app.status === "prefilled" || app.status === "needs_manual") && <Link className="button" href="/review">Review &amp; submit</Link>}
-        {!processing && <button onClick={prepareAgain} title="Tailor the resume and write answers again">Prepare again</button>}
+        {!processing && family && (
+          <button onClick={() => start("tailor", "Write a resume for this posting? About $0.03 with the Batch API.")} title="Replace the family resume with one written for this job">
+            Tailor for this job
+          </button>
+        )}
+        {!processing && app.status === "needs_manual" && app.notes.startsWith("Prepar") && <button onClick={() => start("apply")}>Prepare again</button>}
       </div>
 
+      {resumeSource && (
+        <p className="small muted">
+          Resume: {family ? `your “${family}” role-family resume (shared by similar jobs)` : "written for this posting"}.
+        </p>
+      )}
+      {!processing && remaining > 0 && (
+        <div className="card row">
+          <span className="small">
+            {remaining} question{remaining === 1 ? "" : "s"} still without an answer. Answers you saved before and your configs.md details are filled in for free.
+          </span>
+          <span className="spacer" />
+          <button className="primary" onClick={() => start("answers")}>
+            Write {remaining === 1 ? "the answer" : `${remaining} answers`}
+            {answersCost ? ` (≈$${answersCost.toFixed(answersCost < 0.01 ? 3 : 2)})` : ""}
+          </button>
+        </div>
+      )}
       {processing ? (
         <p className="muted">Tailoring your resume and writing answers… this page updates by itself.</p>
       ) : (
@@ -123,6 +155,7 @@ export function ApplicationEditor({ jobId, application: app, questions, formKnow
                 <strong className="small">{q.label}{q.required && " *"}</strong>
                 <span className="spacer" />
                 {edited.has(q.id) && <span className="chip">edited</span>}
+                {answers[q.id] && <button className="small" onClick={() => copy(answers[q.id]!)}>Copy</button>}
                 {!q.standard && (
                   <label className="small" title="Keep this answer in your words for future applications">
                     <input

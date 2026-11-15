@@ -71,6 +71,8 @@ export const ConfigSchema = z.object({
         })
         .default({ score: "claude-haiku-5-5", write: "claude-sonnet-5-5" }),
       useBatch: z.boolean().default(true),
+      /** Resumes and answers through the Batch API too: half the price, results in minutes instead of seconds. */
+      batchWriting: z.boolean().default(true),
       dailyBudgetUsd: z.number().positive().default(5),
       claudeBin: z.string().default("claude"),
     })
@@ -78,10 +80,19 @@ export const ConfigSchema = z.object({
       mode: "api",
       models: { score: "claude-haiku-5-5", write: "claude-sonnet-5-5" },
       useBatch: true,
+      batchWriting: true,
       dailyBudgetUsd: 5,
       claudeBin: "claude",
     }),
   tracker: z.object({ followUpDays: z.number().int().positive().default(7) }).default({ followUpDays: 7 }),
+  applications: z
+    .object({
+      /** Jobs scoring at least this get a resume tailored to the posting; others get their role-family resume. */
+      tailorMinScore: z.number().min(0).max(101).default(85),
+      /** on-demand: answers are written when you click "Write answers"; auto: while preparing. */
+      answers: z.enum(["on-demand", "auto"]).default("on-demand"),
+    })
+    .default({ tailorMinScore: 85, answers: "on-demand" }),
 });
 
 export type Config = z.infer<typeof ConfigSchema>;

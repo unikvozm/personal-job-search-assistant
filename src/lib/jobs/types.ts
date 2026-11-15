@@ -62,6 +62,8 @@ export interface ScoreResult {
   atsKeywords: string[];
   salary: Salary | null;
   summary: string;
+  /** Closest role family (a hook variant in CV.md); missing for jobs scored before families existed. */
+  roleFamily?: string;
 }
 
 export interface ApplicationQuestion {

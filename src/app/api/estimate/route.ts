@@ -14,7 +14,7 @@ export async function POST(req: Request) {
   if (!config) return json({ error }, 400);
   const { ids } = (await req.json()) as { ids: string[] };
   try {
-    const usd = estimate(config, prepareTasks(jobsRepo.byIds(ids), config), false);
+    const usd = estimate(config, prepareTasks(jobsRepo.byIds(ids), config), config.llm.batchWriting);
     return json({ usd, mode: llmMode(config), spentToday: spentToday(), budget: config.llm.dailyBudgetUsd });
   } catch (e) {
     return json({ error: (e as Error).message }, 400);

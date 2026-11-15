@@ -340,3 +340,53 @@ describe("editing prepared answers", () => {
     expect(saveAnswers(config, app.id, { answers: { q1: answer }, saveToBank: ["q1"] }).addedStories).toEqual([]);
   });
 });
+
+describe("cost-saving preparation", () => {
+  it("picks the role family from the scorer, else from the job's words", async () => {
+    const { familyFor } = await import("./resume/families");
+    const families = ["frontend-platform", "developer-experience", "test-infrastructure"];
+    const base = { title: "Senior Engineer", description: "", scoreResult: null };
+    expect(familyFor({ ...base, scoreResult: { roleFamily: "test-infrastructure" } as never }, families)).toBe("test-infrastructure");
+    expect(familyFor({ ...base, title: "Developer Experience Engineer" }, families)).toBe("developer-experience");
+    expect(familyFor({ ...base, title: "Staff Engineer, Test Infrastructure" }, families)).toBe("test-infrastructure");
+    expect(familyFor({ ...base, title: "Software Engineer" }, families)).toBe("frontend-platform");
+    expect(familyFor(base, [])).toBeNull();
+  });
+
+  it("reuses saved answers only when they fit another company", async () => {
+    const { reusableAnswer } = await import("./stories");
+    const saved = [
+      { id: "S10", question: "Why do you want to work at Acme?", answer: "Acme's mission matters to me.", company: "Acme" },
+      { id: "S11", question: "Tell us about a project you're proud of.", answer: "The TypeScript migration across 15 repos.", company: "Acme" },
+      { id: "S12", question: "Why do you want to work at Acme?", answer: "Because I love building developer tools.", company: "Acme" },
+    ];
+    expect(reusableAnswer("Tell us about a project you're proud of", "Globex", saved)?.id).toBe("S11");
+    // S10 names Acme, so for Globex only the company-neutral S12 is reusable.
+    expect(reusableAnswer("Why do you want to work at Globex?", "Globex", saved)?.id).toBe("S12");
+    expect(reusableAnswer("Why do you want to work at Acme?", "Acme", saved)?.id).toBe("S10");
+    expect(reusableAnswer("Describe a conflict with a colleague", "Globex", saved)).toBeNull();
+  });
+
+  it("plans family resumes once, per-job resumes for top scores, and answers only on demand", async () => {
+    const fsMod = await import("node:fs");
+    const os = await import("node:os");
+    const pathMod = await import("node:path");
+    resetDb(":memory:");
+    const { paths } = await import("./paths");
+    const tmp = fsMod.mkdtempSync(pathMod.join(os.tmpdir(), "jsa-"));
+    const p = paths as { cv: string; stories: string; resumes: string };
+    p.cv = pathMod.resolve("CV.example.md");
+    p.stories = pathMod.join(tmp, "stories.md");
+    p.resumes = pathMod.join(tmp, "resumes");
+    fsMod.writeFileSync(p.stories, "# Bank\n");
+    const { prepareTasks } = await import("./pipeline/prepare");
+    const qs = [{ id: "q1", label: "Why us?", required: true, type: "textarea" as const }];
+    const top = job({ id: "top", fingerprint: "top", score: 92, questions: qs });
+    const midA = job({ id: "midA", fingerprint: "midA", title: "Senior Frontend Engineer", score: 76, questions: qs });
+    const midB = job({ id: "midB", fingerprint: "midB", title: "Frontend Platform Engineer", score: 78, questions: qs });
+    const ids = (opts = {}) => prepareTasks([top, midA, midB], config, opts).map((t) => t.id).sort();
+    expect(ids()).toEqual(["family-frontend-platform", "tailor-top"]);
+    expect(ids({ writeAnswers: true })).toEqual(["answers-midA", "answers-midB", "answers-top", "family-frontend-platform", "tailor-top"]);
+    expect(ids({ tailor: true })).toEqual(["tailor-midA", "tailor-midB", "tailor-top"]);
+  });
+});

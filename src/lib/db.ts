@@ -331,6 +331,7 @@ export const APPLIED_STATUSES = ["submitted", "submit_unconfirmed", "interview",
 export type ApplicationStatus =
   | "preparing"
   | "needs_input"
+  | "awaiting_answers"
   | "ready"
   | "prefilled"
   | "needs_manual"

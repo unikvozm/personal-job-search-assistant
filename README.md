@@ -46,9 +46,16 @@ Everything is also available from the CLI (`pnpm jobs help`) and as Claude Code 
 
 ## Cost and Claude modes
 
-**Settings** switches between:
-- **Anthropic API** (default): Haiku for high-volume scoring through the 50%-cheaper Batch API, Sonnet for writing, CV cached across calls. A typical day (300 jobs scored, 20 applications prepared) costs about $2–3. Every run is estimated first and stops at `llm.dailyBudgetUsd` unless you confirm.
-- **Claude plan**: the same prompts run through the Claude Code CLI (`claude -p`), with no API charges, subject to your plan's limits.
+Costs are kept low without lowering the quality of what employers read:
+
+- **Scoring** uses Haiku through the Batch API with your CV cached: about $0.0005 per job.
+- **Resumes:** one resume per role family (each `<!-- hook:name -->` in CV.md) is written once and reused, and only rewritten when CV.md changes. Jobs scoring `applications.tailorMinScore` (85) or more, or where you click *Tailor for this job*, get a resume written for that posting.
+- **Answers:** details from configs.md and answers you saved to the story bank are filled in for free (saved answers are reused word for word when the question matches and the answer doesn't name another company). The rest are written when you click *Write answers* on the job page (`applications.answers: on-demand`), or while preparing (`auto`).
+- **Batch API for writing** (`llm.batchWriting: true`): resumes and answers cost half, and arrive in minutes instead of seconds.
+
+Each run shows its estimate first and stops at `llm.dailyBudgetUsd` unless you confirm. **Settings** shows the spend per step.
+
+**Settings** also switches to the **Claude plan**: the same prompts run through the Claude Code CLI (`claude -p`), with no API charges, subject to your plan's limits.
 
 ## Job sources
 

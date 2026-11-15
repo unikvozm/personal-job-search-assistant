@@ -63,9 +63,14 @@ llm:
     score: claude-haiku-5-5   # cheap, high volume: scoring, question classification, practice feedback
     write: claude-sonnet-5-5  # resumes, answers, STAR stories, interview prep
   useBatch: true              # 50% cheaper scoring; results usually arrive within minutes
+  batchWriting: true          # resumes and answers via the Batch API too: half the price, a few minutes slower
   dailyBudgetUsd: 5           # runs that would exceed this stop and ask first
   claudeBin: claude           # path to the Claude Code CLI, used in claude-code mode
 
 tracker:
   followUpDays: 7
+
+applications:
+  tailorMinScore: 85          # 85+ gets a resume tailored to the posting; lower scores use the role-family resume
+  answers: on-demand          # on-demand: click "Write answers" on the job page | auto: write them while preparing
 ```

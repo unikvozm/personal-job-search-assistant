@@ -7,7 +7,7 @@ export function GET() {
   return json({ runs: runsRepo.recent(8) });
 }
 
-const COMMANDS = new Set(["daily", "find", "score", "apply", "prepare", "prefill", "prep"]);
+const COMMANDS = new Set(["daily", "find", "score", "apply", "answers", "tailor", "prepare", "prefill", "prep"]);
 
 /**
  * Starts a pipeline step in the background: { kind, ids?, allowOverBudget? }.
@@ -32,7 +32,7 @@ export async function POST(req: Request) {
   if (runsRepo.recent(5).some((r) => r.status === "running")) {
     return json({ error: "Another run is still in progress" }, 409);
   }
-  if (kind === "apply" || kind === "prepare") {
+  if (["apply", "answers", "tailor", "prepare"].includes(kind)) {
     // Show "Processing" right away, before the background process picks the jobs up.
     for (const jobId of ids) applicationsRepo.upsert(jobId, "preparing");
     jobsRepo.setStatus(ids, "applying");

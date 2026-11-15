@@ -4,6 +4,11 @@ import { notFound } from "next/navigation";
 import { formUrl } from "@/lib/apply/prefill";
 import { applicationsRepo, db, jobsRepo } from "@/lib/db";
 import { formatSalary } from "@/lib/jobs/salary";
+import { estimate } from "@/lib/llm";
+import { prepareTasks } from "@/lib/pipeline/prepare";
+import { customQuestions } from "@/lib/pipeline/tasks";
+import { resumeSource } from "@/lib/resume/families";
+import { tryConfig } from "@/lib/server";
 import { ApplicationEditor, type EditorQuestion } from "../../components/ApplicationEditor";
 
 export const dynamic = "force-dynamic";
@@ -26,6 +31,18 @@ export default async function JobPage({ params }: { params: Promise<{ id: string
     .filter((q) => q.type !== "file")
     .map((q) => ({ id: q.id, label: q.label, required: q.required, standard: !!q.standardKey, options: q.options ?? [], hint: hint.get(q.label) ?? "" }));
   const dir = app?.resumeDir ?? "";
+  const { config } = tryConfig();
+  // What "Write answers" would send to Claude (saved answers and configs.md fields are free).
+  const remaining = customQuestions(job).filter((q) => !app?.answers?.[q.id]).length;
+  let answersCost: number | null = null;
+  if (config && app && remaining) {
+    try {
+      const tasks = prepareTasks([job], config, { writeAnswers: true }).filter((t) => t.id.startsWith("answers-"));
+      answersCost = estimate(config, tasks, config.llm.batchWriting);
+    } catch {
+      answersCost = null;
+    }
+  }
 
   return (
     <>
@@ -55,6 +72,9 @@ export default async function JobPage({ params }: { params: Promise<{ id: string
         }
         questions={questions}
         formKnown={job.questions != null}
+        resumeSource={resumeSource(dir || null)}
+        remaining={remaining}
+        answersCost={answersCost}
       />
     </>
   );

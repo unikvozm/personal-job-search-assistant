@@ -61,7 +61,8 @@ export class ApiBackend implements LlmBackend {
   }
 
   async runMany<T>(tasks: LlmTask<T>[], opts: { batch?: boolean; onProgress?: (msg: string) => void } = {}): Promise<TaskResults<T>> {
-    if (opts.batch && tasks.length > 1) return this.runBatch(tasks, opts.onProgress);
+    // Callers decide when batching is worth the wait; a batch of one still costs half.
+    if (opts.batch && tasks.length) return this.runBatch(tasks, opts.onProgress);
     const results: TaskResults<T> = new Map();
     let done = 0;
     await pMap(tasks, 4, async (task) => {

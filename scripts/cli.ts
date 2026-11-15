@@ -24,7 +24,10 @@ const HELP = `Usage: pnpm jobs <command>
   find                 Fetch, filter, dedupe and store new postings (no LLM) → data/runs/<date>/jobDescriptions.md
   score [jobId…]       Score unscored jobs (all, or just these) against CV.md and classify their questions
   daily                find + score
-  prepare <jobId…>     Tailor resume + write answers (or --selected for all ticked jobs)
+  prepare <jobId…>     Resume (family or tailored) + free answers (or --selected for all ticked jobs)
+  apply <jobId…>       prepare, then prefill the forms that are ready
+  answers <jobId…>     Write the remaining answers with Claude, then prefill
+  tailor <jobId…>      Write a resume for these postings (even below applications.tailorMinScore)
   prefill [appId…]     Fill forms headlessly and screenshot them for review (default: all "ready")
   submit <appId>       Submit ONE approved application in a visible browser
   prep <jobId>         Generate interview questions and practice material
@@ -63,10 +66,13 @@ async function main() {
       console.log(await prepareApplications(config, ids, { allowOverBudget }));
       break;
     }
-    case "apply": {
-      // "Apply to selected" in the UI: prepare, then prefill everything that became ready.
+    case "apply":
+    case "answers":
+    case "tailor": {
+      // apply: "Apply to selected" (resume + free answers, Claude answers if applications.answers = auto)
+      // answers: "Write answers" on the job page; tailor: "Tailor for this job".
       if (!args.length) throw new Error("Pass job ids");
-      console.log(await prepareApplications(config, args, { allowOverBudget }));
+      console.log(await prepareApplications(config, args, { allowOverBudget, writeAnswers: command === "answers", tailor: command === "tailor" }));
       const ready = args.map((id) => applicationsRepo.byJob(id)).filter((a) => a?.status === "ready").map((a) => a!.id);
       if (ready.length) console.log(await prefill(config, ready));
       break;

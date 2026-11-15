@@ -1,6 +1,7 @@
 import { z } from "zod";
 import type { Config } from "../config";
 import type { ApplicationQuestion, Job } from "../jobs/types";
+import { roleFamilies } from "../resume/families";
 
 const MAX_JD_CHARS = 8000;
 
@@ -64,6 +65,7 @@ export const ScoreSchema = z.object({
   atsKeywords: z.array(z.string()).describe("important keywords from the job that the CV genuinely supports, max 15"),
   salary: SalaryOut.describe("salary stated in the description, null if none is stated"),
   summary: z.string().describe("one sentence"),
+  roleFamily: z.string().describe("the candidate role family from <facts> closest to this job, or an empty string"),
 });
 
 export const SCORE_SYSTEM = `You are a strict technical recruiter. Compare the candidate (CV and facts in <candidate>) with one job posting and score the fit.
@@ -83,7 +85,9 @@ export function scorePrompt(job: Job): string {
 }
 
 export function candidateContext(cv: string, config: Config): string {
-  return `<candidate>\n<cv>\n${cv}\n</cv>\n<facts>\n${candidateFacts(config)}\n</facts>\n</candidate>`;
+  const families = roleFamilies(cv);
+  const familyLine = families.length > 1 ? `\nRole families: ${families.join(", ")}` : "";
+  return `<candidate>\n<cv>\n${cv}\n</cv>\n<facts>\n${candidateFacts(config)}${familyLine}\n</facts>\n</candidate>`;
 }
 
 // ---------- Question classification ----------

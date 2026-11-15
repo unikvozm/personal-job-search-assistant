@@ -22,6 +22,24 @@ import {
 export const cvAndStories = (cv: string, stories: string) =>
   `<candidate>\n<cv>\n${cv}\n</cv>\n<stories>\n${stories}\n</stories>\n</candidate>`;
 
+/** One resume per role family, written once and reused for every job of that family below tailorMinScore. */
+export const familyTask = (family: string, cv: string, config: Config): LlmTask<z.infer<typeof TailorSchema>> => ({
+  id: `family-${family}`,
+  step: "tailor",
+  tier: "write",
+  system: TAILOR_SYSTEM,
+  context: candidateContext(cv, config),
+  prompt: [
+    `There is no single job posting: write the resume for the role family "${family}", for recruiters hiring for that kind of role.`,
+    `Use the hook variant "${family}". Headline: the family's typical titles and top skills from the CV.`,
+    "Work authorization line: keep it as in the master CV (it covers both the US and Europe).",
+    "Order skills and bullets by what employers in this family value most.",
+  ].join("\n"),
+  schema: TailorSchema,
+  maxTokens: 16000,
+  effort: "medium",
+});
+
 export const tailorTask = (job: Job, cv: string, config: Config): LlmTask<z.infer<typeof TailorSchema>> => ({
   id: `tailor-${job.id}`,
   step: "tailor",
@@ -38,13 +56,13 @@ export const tailorTask = (job: Job, cv: string, config: Config): LlmTask<z.infe
 export const customQuestions = (job: Job): ApplicationQuestion[] =>
   (job.questions ?? []).filter((q) => !q.standardKey && q.type !== "file");
 
-export const answersTask = (job: Job, context: string): LlmTask<z.infer<typeof AnswersSchema>> => ({
+export const answersTask = (job: Job, context: string, questions: ApplicationQuestion[] = customQuestions(job)): LlmTask<z.infer<typeof AnswersSchema>> => ({
   id: `answers-${job.id}`,
   step: "answers",
   tier: "write",
   system: ANSWERS_SYSTEM,
   context,
-  prompt: answersPrompt(job, customQuestions(job)),
+  prompt: answersPrompt(job, questions),
   schema: AnswersSchema,
   maxTokens: 12000,
   effort: "medium",

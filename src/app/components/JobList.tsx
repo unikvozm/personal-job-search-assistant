@@ -97,7 +97,7 @@ export function JobList(props: Props) {
       const cost = est.mode === "api" ? `Estimated $${est.usd.toFixed(2)} (today: $${est.spentToday.toFixed(2)} of $${est.budget}).` : "Runs on your Claude plan.";
       const over = est.mode === "api" && est.spentToday + est.usd > est.budget;
       const ok = confirm(
-        `Prepare ${ids.length} application(s): tailored resume + answers, then prefill the forms.\n${cost}${over ? "\n\nThis exceeds your daily budget." : ""}\n\nNothing is submitted until you approve each one in Review.`,
+        `Prepare ${ids.length} application(s): a resume (your role-family resume, or one written for the posting when the score is high), answers from your details and saved answers, then prefill the forms.\nRemaining answers are written when you click "Write answers" on the job page.\n${cost}${over ? "\n\nThis exceeds your daily budget." : ""}\n\nNothing is submitted until you approve each one in Review.`,
       );
       if (!ok) return;
       await post("/api/runs", { kind: "apply", ids, allowOverBudget: over });
