@@ -304,3 +304,39 @@ describe("adding jobs yourself", () => {
     expect(applicationsRepo.byJob(first!.jobId!)!.submittedAt).not.toBeNull();
   });
 });
+
+describe("editing prepared answers", () => {
+  it("saves answers, resolves open questions, adds chosen ones to the story bank and moves on", async () => {
+    const fsMod = await import("node:fs");
+    const os = await import("node:os");
+    const pathMod = await import("node:path");
+    resetDb(":memory:");
+    const { paths } = await import("./paths");
+    const tmp = fsMod.mkdtempSync(pathMod.join(os.tmpdir(), "jsa-"));
+    const storiesFile = pathMod.join(tmp, "stories.md");
+    fsMod.writeFileSync(storiesFile, "# Interview story bank\n\n## S01 — Existing\nTags: x\n**Situation:** s\n");
+    (paths as { stories: string }).stories = storiesFile;
+
+    const { addJobs } = await import("./pipeline/add");
+    const { applicationsRepo, db } = await import("./db");
+    const { saveAnswers } = await import("./pipeline/answersEdit");
+    const [r] = await addJobs(config, {
+      pasted: { company: "Acme", title: "DevEx Engineer", description: "y".repeat(200), questions: "Why Acme? *\nYour LinkedIn" },
+    });
+    const app = applicationsRepo.upsert(r!.jobId!, "needs_input");
+    applicationsRepo.update(app.id, { resumeDir: tmp });
+    db().prepare("INSERT INTO pending_stories (job_id, question, clarifying_question, created_at) VALUES (?,?,?,?)").run(r!.jobId!, "Why Acme?", "What draws you?", "t");
+
+    const answer = "Because Acme builds developer tooling I use every day, and I want to make other engineers faster.";
+    const res = saveAnswers(config, app.id, { answers: { q1: answer }, saveToBank: ["q1"] });
+
+    expect(res.status).toBe("ready");
+    expect(res.addedStories).toEqual(["S02"]);
+    expect(fsMod.readFileSync(storiesFile, "utf8")).toContain(`**Answer:** ${answer}`);
+    expect(fsMod.readFileSync(pathMod.join(tmp, "answers.md"), "utf8")).toContain(answer);
+    expect(applicationsRepo.get(app.id)!.answers!.q1).toBe(answer);
+    expect((db().prepare("SELECT status FROM pending_stories").get() as { status: string }).status).toBe("approved");
+    // Saving the same answer again doesn't duplicate it in the bank.
+    expect(saveAnswers(config, app.id, { answers: { q1: answer }, saveToBank: ["q1"] }).addedStories).toEqual([]);
+  });
+});

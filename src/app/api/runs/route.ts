@@ -1,4 +1,4 @@
-import { runsRepo } from "@/lib/db";
+import { applicationsRepo, jobsRepo, runsRepo } from "@/lib/db";
 import { json, startCli, rejectCrossSite } from "@/lib/server";
 
 export const dynamic = "force-dynamic";
@@ -31,6 +31,11 @@ export async function POST(req: Request) {
   // recent() first marks runs whose process has died as interrupted, so only live runs block.
   if (runsRepo.recent(5).some((r) => r.status === "running")) {
     return json({ error: "Another run is still in progress" }, 409);
+  }
+  if (kind === "apply" || kind === "prepare") {
+    // Show "Processing" right away, before the background process picks the jobs up.
+    for (const jobId of ids) applicationsRepo.upsert(jobId, "preparing");
+    jobsRepo.setStatus(ids, "applying");
   }
   const daysFlag = Number.isInteger(days) && days! > 0 && days! <= 90 ? [`--days=${days}`] : [];
   const log = startCli([kind, ...ids.map(String), ...(allowOverBudget ? ["--allow-over-budget"] : []), ...daysFlag]);

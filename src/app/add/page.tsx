@@ -1,6 +1,7 @@
 import { jobsRepo } from "@/lib/db";
 import { groupJobs } from "@/lib/jobs/sort";
-import { toView } from "@/lib/jobView";
+import { inProgressItems, toView } from "@/lib/jobView";
+import { InProgress } from "../components/InProgress";
 import { tryConfig } from "@/lib/server";
 import { ADDED_SOURCES } from "@/lib/sources/manual";
 import { AddJobsForm } from "../components/AddJobsForm";
@@ -12,7 +13,7 @@ export const dynamic = "force-dynamic";
 export default function AddJobsPage() {
   const { config, error } = tryConfig();
   if (!config) return <SetupNotice error={error} />;
-  const added = jobsRepo.bySources(ADDED_SOURCES).filter((j) => j.status !== "applied");
+  const added = jobsRepo.bySources(ADDED_SOURCES).filter((j) => j.status !== "applied" && j.status !== "applying");
   const scored = added.filter((j) => j.status !== "new");
   const unscored = added.filter((j) => j.status === "new");
   // Jobs you picked yourself are all shown, whatever their score.
@@ -25,6 +26,7 @@ export default function AddJobsPage() {
         Paste links or a job description. Jobs are scored against your CV right away; tick the ones you want and click “Apply to selected”, as on the Jobs page.
       </p>
       <AddJobsForm />
+      <InProgress items={inProgressItems((j) => (ADDED_SOURCES as readonly string[]).includes(j.source))} />
       <h2>Your added jobs</h2>
       {added.length === 0 ? (
         <p className="muted">Nothing added yet.</p>

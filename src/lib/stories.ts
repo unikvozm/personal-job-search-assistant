@@ -28,8 +28,9 @@ export function storyIndex(stories: Story[]): string {
 }
 
 function firstLine(body: string): string {
-  const situation = body.match(/\*\*Situation:\*\*\s*(.+)/)?.[1] ?? "";
-  return situation.slice(0, 160);
+  // STAR stories start with the Situation; saved application answers with the Answer.
+  const line = body.match(/\*\*Situation:\*\*\s*(.+)/)?.[1] ?? body.match(/\*\*Answer:\*\*\s*(.+)/)?.[1] ?? "";
+  return line.slice(0, 160);
 }
 
 export function nextStoryId(stories: Story[]): string {
@@ -46,6 +47,12 @@ export function formatStory(id: string, s: { title: string; tags: string[]; situ
     `**Action:** ${s.action}`,
     `**Result:** ${s.result}`,
   ].join("\n");
+}
+
+/** A reusable application answer, kept in your own words (not rewritten into STAR). */
+export function formatAnswerStory(id: string, a: { question: string; answer: string; company: string }): string {
+  const title = a.question.length > 90 ? `${a.question.slice(0, 87).trimEnd()}…` : a.question;
+  return [`## ${id} — ${title}`, `Tags: application answer, ${a.company}`, `**Question:** ${a.question}`, `**Answer:** ${a.answer.trim()}`].join("\n");
 }
 
 export function appendStory(markdown: string): void {

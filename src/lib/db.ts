@@ -276,10 +276,19 @@ export const runsRepo = {
   /** Marks "running" runs whose process is gone (crash, killed, dev server restart) as interrupted. */
   reapStale() {
     const rows = db().prepare("SELECT id, pid FROM runs WHERE status = 'running'").all() as Row[];
+    let stillRunning = 0;
     for (const r of rows) {
       if (r.pid == null || !isAlive(r.pid as number)) {
         this.fail(r.id as string, "Interrupted: the run's process ended before it finished. Start it again.");
-      }
+      } else stillRunning++;
+    }
+    // Applications left "preparing" by a run that is gone would show "Processing" forever.
+    // The 2-minute grace covers the moment between clicking Apply and the background run starting.
+    if (!stillRunning) {
+      const graceStart = new Date(Date.now() - 2 * 60_000).toISOString();
+      db()
+        .prepare("UPDATE applications SET status = 'needs_manual', notes = ?, updated_at = ? WHERE status = 'preparing' AND updated_at < ?")
+        .run("Preparation was interrupted. Open the job and click Prepare again.", now(), graceStart);
     }
   },
   /** Stops a running run: ends its process and marks it failed. */

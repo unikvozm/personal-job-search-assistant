@@ -129,7 +129,7 @@ function addPendingStory(jobId: string, question: string, clarifying: string) {
     .run(jobId, question, clarifying, now());
 }
 
-function answersMarkdown(job: Job, answers: Record<string, string>): string {
+export function answersMarkdown(job: Job, answers: Record<string, string>): string {
   const lines = [`# Application answers — ${job.title} at ${job.company}`, ""];
   for (const q of job.questions ?? []) {
     if (q.type === "file") continue;

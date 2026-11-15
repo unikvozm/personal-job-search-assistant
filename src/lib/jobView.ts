@@ -1,5 +1,7 @@
 import type { JobView } from "@/app/components/JobList";
-import { applicationsRepo } from "./db";
+import type { InProgressItem } from "@/app/components/InProgress";
+import { IN_PROGRESS_STATUSES } from "./applicationStatus";
+import { applicationsRepo, jobsRepo } from "./db";
 import { formatSalary } from "./jobs/salary";
 import type { Job } from "./jobs/types";
 import { ADDED_SOURCES } from "./sources/manual";
@@ -37,3 +39,12 @@ export function toView(j: Job): JobView {
   };
 }
 
+
+/** Rows for the "In progress" section: applications not yet submitted or skipped. */
+export function inProgressItems(filter: (job: Job) => boolean = () => true): InProgressItem[] {
+  return applicationsRepo.byStatus(...IN_PROGRESS_STATUSES).flatMap((app) => {
+    const job = jobsRepo.get(app.jobId);
+    if (!job || !filter(job)) return [];
+    return [{ jobId: job.id, title: job.title, company: job.company, score: job.score, status: app.status, note: app.notes, updatedAt: app.updatedAt }];
+  });
+}

@@ -4,7 +4,8 @@ import { llmMode } from "@/lib/llm";
 import { spentToday } from "@/lib/llm/cost";
 import { tryConfig } from "@/lib/server";
 import { JobList } from "./components/JobList";
-import { toView } from "@/lib/jobView";
+import { inProgressItems, toView } from "@/lib/jobView";
+import { InProgress } from "./components/InProgress";
 import { RunPanel } from "./components/RunPanel";
 import { SetupNotice } from "./components/SetupNotice";
 
@@ -23,7 +24,7 @@ export default async function JobsPage({ searchParams }: { searchParams: Promise
   const threshold = config.scoring.threshold;
 
   const scored = postedWithin(
-    jobsRepo.byStatus("scored", "skipped", "hidden", "applying", ...(showLowScores ? (["below_threshold", "ineligible"] as const) : [])),
+    jobsRepo.byStatus("scored", "skipped", "hidden", ...(showLowScores ? (["below_threshold", "ineligible"] as const) : [])),
     posted,
   );
   const unscored = postedWithin(jobsRepo.byStatus("new"), posted).sort((a, b) => (b.postedAt ?? "").localeCompare(a.postedAt ?? ""));
@@ -42,6 +43,7 @@ export default async function JobsPage({ searchParams }: { searchParams: Promise
         {llmMode(config) === "api" && ` · today $${spentToday().toFixed(2)} of $${config.llm.dailyBudgetUsd}`}
       </p>
       <RunPanel initialRuns={runsRepo.recent(5)} newJobs={jobsRepo.byStatus("new").length} />
+      <InProgress items={inProgressItems()} />
       <JobList
         groups={groups.map((g) => ({ key: g.key, title: g.title, ready: g.ready.map(toView), needsInput: g.needsInput.map(toView) }))}
         unscored={unscored.map(toView)}

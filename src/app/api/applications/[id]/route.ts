@@ -1,4 +1,5 @@
-import { APPLIED_STATUSES, applicationsRepo, jobsRepo, now, type Application } from "@/lib/db";
+import { APPLIED_STATUSES, applicationsRepo, jobsRepo, now, runsRepo, type Application } from "@/lib/db";
+import { saveAnswers } from "@/lib/pipeline/answersEdit";
 import { json, startCli, tryConfig, rejectCrossSite } from "@/lib/server";
 
 export const dynamic = "force-dynamic";
@@ -7,6 +8,7 @@ type Body =
   | { action: "approve" }
   | { action: "skip" }
   | { action: "markSubmitted" }
+  | { action: "saveAnswers"; answers: Record<string, string>; saveToBank: string[] }
   | { action: "update"; patch: Partial<Pick<Application, "status" | "answers" | "notes" | "followUpAt" | "interviewAt">> };
 
 export async function POST(req: Request, ctx: { params: Promise<{ id: string }> }) {
@@ -20,6 +22,14 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
   const followUpDays = config?.tracker.followUpDays ?? 7;
 
   switch (body.action) {
+    case "saveAnswers": {
+      if (!config) return json({ error: "configs.md is missing or invalid" }, 400);
+      const result = saveAnswers(config, id, { answers: body.answers, saveToBank: body.saveToBank ?? [] });
+      // New answers on a fillable form: redo the prefill so the Review screenshot matches.
+      const refill = result.prefill && !runsRepo.recent(5).some((r) => r.status === "running");
+      if (refill) startCli(["prefill", String(id)]);
+      return json({ ...result, prefilling: refill });
+    }
     case "approve":
       // Your per-application yes: submits in a visible browser on this machine.
       if (app.status !== "prefilled") return json({ error: "Only prefilled applications can be auto-submitted" }, 400);
