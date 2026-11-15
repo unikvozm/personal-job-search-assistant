@@ -76,7 +76,11 @@ export function ReviewQueue({ items }: { items: ReviewItem[] }) {
         <strong>{item.title}</strong> <span className="muted">· {item.company} · score {item.score}</span>
         <span className="spacer" />
         <a className="button" href={item.url} target="_blank" rel="noreferrer">Open form</a>
-        {item.resumePdf && <a className="button" href={fileUrl(item.resumePdf)} target="_blank" rel="noreferrer">Resume PDF</a>}
+        {item.resumePdf && (
+          <a className="button" href={fileUrl(item.resumePdf)} target="_blank" rel="noreferrer" title="CV to attach">
+            CV: {item.resumePdf.split("/").pop()}
+          </a>
+        )}
         {manual ? (
           <button className="primary" onClick={() => act("markSubmitted")}>I submitted it (A)</button>
         ) : (

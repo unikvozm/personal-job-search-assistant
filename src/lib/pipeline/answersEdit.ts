@@ -6,6 +6,7 @@ import { readStories } from "../config";
 import { ensureDir } from "../paths";
 import { appendStory, formatAnswerStory, loadStories, nextStoryId } from "../stories";
 import { answersMarkdown, resumeDirFor } from "./prepare";
+import { resumeFileFor } from "../resume/readyCvs";
 
 const FILLABLE = new Set(["greenhouse", "lever", "ashby"]);
 
@@ -23,7 +24,7 @@ export interface SaveAnswersResult {
  * the story bank, in your exact words. Questions waiting for your input are resolved, and a
  * "needs input" application moves on to "ready" once every required question has an answer.
  */
-export function saveAnswers(_config: Config, applicationId: number, input: { answers: Record<string, string>; saveToBank: string[] }): SaveAnswersResult {
+export function saveAnswers(config: Config, applicationId: number, input: { answers: Record<string, string>; saveToBank: string[] }): SaveAnswersResult {
   const app = applicationsRepo.get(applicationId);
   if (!app) throw new Error(`Application ${applicationId} not found`);
   const job = jobsRepo.get(app.jobId)!;
@@ -36,7 +37,7 @@ export function saveAnswers(_config: Config, applicationId: number, input: { ans
   }
 
   const dir = app.resumeDir ?? ensureDir(resumeDirFor(job));
-  fs.writeFileSync(path.join(ensureDir(dir), "answers.md"), answersMarkdown(job, answers));
+  fs.writeFileSync(path.join(ensureDir(dir), "answers.md"), answersMarkdown(job, answers, resumeFileFor(job, dir, config)));
 
   // Questions you answered no longer need a clarifying story.
   const resolve = db().prepare("UPDATE pending_stories SET status = 'approved' WHERE job_id = ? AND question = ? AND status IN ('open', 'drafted')");
@@ -58,7 +59,7 @@ export function saveAnswers(_config: Config, applicationId: number, input: { ans
   if (status === "needs_input" && !missing.length) status = "ready";
   applicationsRepo.update(app.id, { answers, status, resumeDir: dir });
 
-  const hasResume = fs.existsSync(path.join(dir, "resume.pdf"));
+  const hasResume = resumeFileFor(job, dir, config) != null;
   const prefill = hasResume && !!job.ats && FILLABLE.has(job.ats) && (status === "ready" || status === "prefilled");
   return { status, addedStories, prefill, missing };
 }

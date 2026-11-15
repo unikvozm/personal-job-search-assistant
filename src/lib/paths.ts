@@ -13,6 +13,8 @@ export const paths = {
   db: path.join(ROOT, "data", "tracker.sqlite"),
   runs: path.join(ROOT, "data", "runs"),
   resumes: path.join(ROOT, "data", "resumes"),
+  /** Ready CVs, one per role family (cvs/<family>.md + rendered PDFs). Personal, gitignored. */
+  cvs: path.join(ROOT, "cvs"),
   screenshots: path.join(ROOT, "data", "screenshots"),
   logs: path.join(ROOT, "data", "logs"),
 };

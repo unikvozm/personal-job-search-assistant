@@ -87,12 +87,10 @@ export const ConfigSchema = z.object({
   tracker: z.object({ followUpDays: z.number().int().positive().default(7) }).default({ followUpDays: 7 }),
   applications: z
     .object({
-      /** Jobs scoring at least this get a resume tailored to the posting; others get their role-family resume. */
-      tailorMinScore: z.number().min(0).max(101).default(85),
       /** on-demand: answers are written when you click "Write answers"; auto: while preparing. */
       answers: z.enum(["on-demand", "auto"]).default("on-demand"),
     })
-    .default({ tailorMinScore: 85, answers: "on-demand" }),
+    .default({ answers: "on-demand" }),
 });
 
 export type Config = z.infer<typeof ConfigSchema>;

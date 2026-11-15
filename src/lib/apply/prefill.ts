@@ -6,6 +6,7 @@ import { applicationsRepo, jobsRepo, now, runsRepo, type Application } from "../
 import type { ApplicationQuestion, Job } from "../jobs/types";
 import { ensureDir, paths } from "../paths";
 import { launch, sharedBrowser, closeSharedBrowser } from "./browser";
+import { resumeFileFor } from "../resume/readyCvs";
 
 /** ATSs whose forms we fill automatically; everything else goes to the queue as "open & copy". */
 const FILLABLE = new Set(["greenhouse", "lever", "ashby"]);
@@ -61,8 +62,8 @@ async function fillQuestion(page: Page, q: ApplicationQuestion, value: string, r
 }
 
 /** Fills every answered question; returns labels of required questions that are still empty. */
-export async function fillForm(page: Page, job: Job, app: Application): Promise<string[]> {
-  const resumePdf = path.join(app.resumeDir ?? "", "resume.pdf");
+export async function fillForm(page: Page, job: Job, app: Application, config: Config): Promise<string[]> {
+  const resumePdf = resumeFileFor(job, app.resumeDir, config) ?? "";
   const missing: string[] = [];
   // Lever and Ashby show the form only after clicking "Apply".
   const applyButton = page.getByRole("button", { name: /^apply( for this job| now)?$/i }).or(page.getByRole("link", { name: /^apply( for this job| now)?$/i }));
@@ -95,14 +96,14 @@ export async function prefill(config: Config, applicationIds?: number[], log: (m
         log(`  ${job.company}: manual (form on ${new URL(formUrl(job)).hostname})`);
         continue;
       }
-      if (!fs.existsSync(path.join(app.resumeDir ?? "", "resume.pdf"))) {
-        log(`  ${job.company}: no resume.pdf yet - run prepare first`);
+      if (!resumeFileFor(job, app.resumeDir, config)) {
+        log(`  ${job.company}: no CV to attach yet - run prepare first`);
         continue;
       }
       const page = await browser.newPage({ viewport: { width: 1280, height: 900 } });
       try {
         await page.goto(formUrl(job), { waitUntil: "networkidle", timeout: 60_000 });
-        const missing = await fillForm(page, job, app);
+        const missing = await fillForm(page, job, app, config);
         const shot = path.join(ensureDir(paths.screenshots), `${app.id}.png`);
         await page.screenshot({ path: shot, fullPage: true });
         applicationsRepo.update(app.id, { status: "prefilled", missingFields: missing, screenshot: shot, prefilledAt: now() });
@@ -143,7 +144,7 @@ export async function submit(config: Config, applicationId: number, log: (m: str
   try {
     const page = await browser.newPage({ viewport: { width: 1280, height: 900 } });
     await page.goto(formUrl(job), { waitUntil: "networkidle", timeout: 60_000 });
-    const missing = await fillForm(page, job, app);
+    const missing = await fillForm(page, job, app, config);
     const needsHuman = missing.length > 0 || (await page.locator(CAPTCHA).count()) > 0;
     if (needsHuman) {
       log(`Waiting for you to finish in the browser window${missing.length ? ` (missing: ${missing.join("; ")})` : " (CAPTCHA)"}…`);

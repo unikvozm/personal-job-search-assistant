@@ -1,6 +1,13 @@
 import fs from "node:fs";
 import { prefill, submit } from "../src/lib/apply/prefill";
-import { loadConfig } from "../src/lib/config";
+import path from "node:path";
+import { closeSharedBrowser } from "../src/lib/apply/browser";
+import { loadConfig, readCv } from "../src/lib/config";
+import { getBackend, guardBudget } from "../src/lib/llm";
+import { paths } from "../src/lib/paths";
+import { familyTask } from "../src/lib/pipeline/tasks";
+import { roleFamilies } from "../src/lib/resume/families";
+import { readyCvs, renderReadyCvs } from "../src/lib/resume/readyCvs";
 import { applicationsRepo, jobsRepo } from "../src/lib/db";
 import { BudgetError, spentToday } from "../src/lib/llm/cost";
 import { llmMode } from "../src/lib/llm";
@@ -27,7 +34,8 @@ const HELP = `Usage: pnpm jobs <command>
   prepare <jobId…>     Resume (family or tailored) + free answers (or --selected for all ticked jobs)
   apply <jobId…>       prepare, then prefill the forms that are ready
   answers <jobId…>     Write the remaining answers with Claude, then prefill
-  tailor <jobId…>      Write a resume for these postings (even below applications.tailorMinScore)
+  tailor <jobId…>      Write a resume for these postings instead of using the ready CV
+  cvs [--generate]     Render cvs/*.md to 1-page PDFs; --generate drafts missing ones with Claude (once)
   prefill [appId…]     Fill forms headlessly and screenshot them for review (default: all "ready")
   submit <appId>       Submit ONE approved application in a visible browser
   prep <jobId>         Generate interview questions and practice material
@@ -75,6 +83,33 @@ async function main() {
       console.log(await prepareApplications(config, args, { allowOverBudget, writeAnswers: command === "answers", tailor: command === "tailor" }));
       const ready = args.map((id) => applicationsRepo.byJob(id)).filter((a) => a?.status === "ready").map((a) => a!.id);
       if (ready.length) console.log(await prefill(config, ready));
+      break;
+    }
+    case "cvs": {
+      if (flags.has("--generate")) {
+        const cv = readCv();
+        const have = new Set(readyCvs(config).map((c) => c.family));
+        const missing = roleFamilies(cv).filter((f) => !have.has(f));
+        if (!missing.length) console.log("Every role family in CV.md already has a ready CV.");
+        else {
+          const tasks = missing.map((f) => familyTask(f, cv, config));
+          guardBudget(config, tasks, false, allowOverBudget);
+          const results = await getBackend(config).runMany(tasks);
+          fs.mkdirSync(paths.cvs, { recursive: true });
+          for (const f of missing) {
+            const r = results.get(`family-${f}`);
+            if (!r || r instanceof Error) console.warn(`✖ ${f}: ${r?.message ?? "no result"}`);
+            else {
+              fs.writeFileSync(path.join(paths.cvs, `${f}.md`), (r as { markdown: string }).markdown);
+              console.log(`✓ cvs/${f}.md drafted - review and edit it`);
+            }
+          }
+        }
+      }
+      for (const r of await renderReadyCvs(config, flags.has("--force"))) {
+        console.log(`${r.pages > 1 ? "⚠️" : "✓"} ${path.basename(r.file)}: ${r.rendered ? `${r.pages} page(s)` : "up to date"}`);
+      }
+      await closeSharedBrowser();
       break;
     }
     case "prefill":

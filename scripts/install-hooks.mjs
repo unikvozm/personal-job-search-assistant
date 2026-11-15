@@ -7,7 +7,7 @@ if (!fs.existsSync(gitDir)) process.exit(0);
 
 const hook = `#!/bin/sh
 # Installed by scripts/install-hooks.mjs - blocks personal data from being committed.
-blocked=$(git diff --cached --name-only --diff-filter=ACMR | grep -E '^(CV\\.md|interviewBankStories\\.md|configs\\.md|\\.env(\\..*)?|data/.*|personal/.*)$' | grep -v '^\\.env\\.example$')
+blocked=$(git diff --cached --name-only --diff-filter=ACMR | grep -E '^(CV\\.md|interviewBankStories\\.md|configs\\.md|\\.env(\\..*)?|data/.*|personal/.*|cvs/.*)$' | grep -v '^\\.env\\.example$')
 if [ -n "$blocked" ]; then
   echo "✖ Refusing to commit personal files:"
   echo "$blocked" | sed 's/^/    /'

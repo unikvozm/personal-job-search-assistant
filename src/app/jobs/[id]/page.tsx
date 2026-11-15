@@ -8,6 +8,7 @@ import { estimate } from "@/lib/llm";
 import { prepareTasks } from "@/lib/pipeline/prepare";
 import { customQuestions } from "@/lib/pipeline/tasks";
 import { resumeSource } from "@/lib/resume/families";
+import { resumeFileFor } from "@/lib/resume/readyCvs";
 import { tryConfig } from "@/lib/server";
 import { ApplicationEditor, type EditorQuestion } from "../../components/ApplicationEditor";
 
@@ -64,7 +65,7 @@ export default async function JobPage({ params }: { params: Promise<{ id: string
                 status: app.status,
                 notes: app.notes,
                 answers: app.answers ?? {},
-                resumePdf: dir && fs.existsSync(path.join(dir, "resume.pdf")) ? path.join(dir, "resume.pdf") : null,
+                resumePdf: config ? resumeFileFor(job, dir || null, config) : null,
                 changes: dir ? read(path.join(dir, "changes.md")) : "",
                 formUrl: formUrl(job),
               }

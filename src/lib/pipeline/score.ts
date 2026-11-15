@@ -8,7 +8,9 @@ import { isBelowMin } from "../jobs/salary";
 import type { ApplicationQuestion, Job, JobStatus } from "../jobs/types";
 import { getBackend, guardBudget, type LlmTask } from "../llm";
 import type { TaskResults } from "../llm/types";
-import { CLASSIFY_SYSTEM, ClassifySchema, SCORE_SYSTEM, ScoreSchema, candidateContext, classifyPrompt, scorePrompt } from "../llm/prompts";
+import { CLASSIFY_SYSTEM, ClassifySchema, SCORE_SYSTEM, ScoreSchema, classifyPrompt, scoringContext, scorePrompt } from "../llm/prompts";
+import { readyCvs } from "../resume/readyCvs";
+import fs from "node:fs";
 import { pMap } from "../sources/http";
 import { loadStories, storyIndex } from "../stories";
 import { z } from "zod";
@@ -34,7 +36,8 @@ export async function scoreJobs(config: Config, opts: StepOptions = {}) {
   const run = runsRepo.start("score");
   try {
     const backend = getBackend(config);
-    const context = candidateContext(readCv(), config);
+    const ready = readyCvs(config).map((c) => ({ family: c.family, markdown: fs.readFileSync(c.md, "utf8") }));
+    const context = scoringContext(readCv(), config, ready);
     const tasks: LlmTask<z.infer<typeof ScoreSchema>>[] = jobs.map((job) => ({
       id: job.id,
       step: "score",

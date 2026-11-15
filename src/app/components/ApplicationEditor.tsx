@@ -38,6 +38,7 @@ interface Props {
 }
 
 const words = (s: string) => s.trim().split(/\s+/).filter(Boolean).length;
+const fileName = (p: string) => p.split("/").pop() ?? p;
 
 export function ApplicationEditor({ jobId, application: app, questions, formKnown, resumeSource, remaining, answersCost }: Props) {
   const router = useRouter();
@@ -115,21 +116,28 @@ export function ApplicationEditor({ jobId, application: app, questions, formKnow
         <span className={`chip status-${app.status}`}>{statusLabel(app.status)}</span>
         {app.notes && <span className="small muted">{app.notes}</span>}
         <span className="spacer" />
-        {app.resumePdf && <a className="button" href={fileUrl(app.resumePdf)} target="_blank" rel="noreferrer">Resume PDF</a>}
+        {app.resumePdf && <a className="button" href={fileUrl(app.resumePdf)} target="_blank" rel="noreferrer">Open CV</a>}
         <a className="button" href={app.formUrl} target="_blank" rel="noreferrer">Application form</a>
         {(app.status === "prefilled" || app.status === "needs_manual") && <Link className="button" href="/review">Review &amp; submit</Link>}
-        {!processing && family && (
-          <button onClick={() => start("tailor", "Write a resume for this posting? About $0.03 with the Batch API.")} title="Replace the family resume with one written for this job">
+        {!processing && (family || !app.resumePdf) && (
+          <button onClick={() => start("tailor", "Write a resume for this posting with Claude? About $0.03 with the Batch API. Your ready CV stays as it is.")} title="Write a resume for this job instead of using the ready CV">
             Tailor for this job
           </button>
         )}
         {!processing && app.status === "needs_manual" && app.notes.startsWith("Prepar") && <button onClick={() => start("apply")}>Prepare again</button>}
       </div>
 
-      {resumeSource && (
-        <p className="small muted">
-          Resume: {family ? `your “${family}” role-family resume (shared by similar jobs)` : "written for this posting"}.
-        </p>
+      {app.resumePdf ? (
+        <div className="card row">
+          <span>
+            <strong>CV to attach:</strong> <a href={fileUrl(app.resumePdf)} target="_blank" rel="noreferrer">{fileName(app.resumePdf)}</a>
+          </span>
+          <span className="small muted">
+            {family ? `your ready ${family} CV` : resumeSource === "tailored" ? "written for this posting" : ""}
+          </span>
+        </div>
+      ) : (
+        !processing && <p className="small warn">No CV for this job yet. Add a ready CV in cvs/ or click “Tailor for this job”.</p>
       )}
       {!processing && remaining > 0 && (
         <div className="card row">

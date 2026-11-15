@@ -18,7 +18,8 @@
     "jobs:answers": "tsx scripts/cli.ts answers",
     "jobs:prefill": "tsx scripts/cli.ts prefill",
     "jobs:submit": "tsx scripts/cli.ts submit",
-    "jobs:prep": "tsx scripts/cli.ts prep"
+    "jobs:prep": "tsx scripts/cli.ts prep",
+    "cvs": "tsx scripts/cli.ts cvs"
   },
   "engines": {
     "node": ">=22.13"

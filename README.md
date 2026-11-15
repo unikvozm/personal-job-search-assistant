@@ -24,7 +24,8 @@ pnpm exec playwright install chromium    # PDFs, form reading, prefill
 ```
 
 1. **configs.md**: fill in the YAML block. `search.countries` (ISO codes, or `REMOTE`) and `search.titles` are required; the countries decide which boards are searched. Add 20–50 `targetCompanies` (their Greenhouse/Lever/Ashby/SmartRecruiters board slug) for the best results.
-2. **CV.md**: your full master CV in Markdown (it can be longer than a page; every tailored resume is cut to one page). Wrap your hook sentence in `<!-- hook -->…<!-- /hook -->`, or add one variant per role family as `<!-- hook:name -->…<!-- /hook -->`; tailoring picks one and never rewords it. The layout (gold and dark grey, single column, ATS-friendly) and the Markdown structure it expects are described at the top of `src/lib/resume/render.ts`.
+2. **cvs/** (optional but recommended): one ready, one-page CV per role family, e.g. `cvs/frontend-platform.md`, in the same Markdown format. These are what you send.
+3. **CV.md**: your full master CV in Markdown (it can be longer than a page; every tailored resume is cut to one page). Wrap your hook sentence in `<!-- hook -->…<!-- /hook -->`, or add one variant per role family as `<!-- hook:name -->…<!-- /hook -->`; tailoring picks one and never rewords it. The layout (gold and dark grey, single column, ATS-friendly) and the Markdown structure it expects are described at the top of `src/lib/resume/render.ts`.
 3. **interviewBankStories.md**: your STAR stories (`## S01 — Title`, `Tags:`, Situation/Task/Action/Result).
 4. **.env.local**: `ANTHROPIC_API_KEY` for API mode; optionally a free [Adzuna](https://developer.adzuna.com) key for national job boards.
 
@@ -49,7 +50,7 @@ Everything is also available from the CLI (`pnpm jobs help`) and as Claude Code 
 Costs are kept low without lowering the quality of what employers read:
 
 - **Scoring** uses Haiku through the Batch API with your CV cached: about $0.0005 per job.
-- **Resumes:** one resume per role family (each `<!-- hook:name -->` in CV.md) is written once and reused, and only rewritten when CV.md changes. Jobs scoring `applications.tailorMinScore` (85) or more, or where you click *Tailor for this job*, get a resume written for that posting.
+- **Resumes:** you keep one ready CV per role family in `cvs/<family>.md` (gitignored; rendered to 1-page PDFs named like `Your_Name_CV_Frontend_Platform.pdf`, Letter and A4, with `pnpm cvs`). Jobs are scored against these ready CVs, and each application uses the one that fits, unchanged. A resume for a single posting is only written when you click *Tailor for this job*. No ready CVs yet? `pnpm jobs cvs --generate` drafts one per hook variant in CV.md, once.
 - **Answers:** details from configs.md and answers you saved to the story bank are filled in for free (saved answers are reused word for word when the question matches and the answer doesn't name another company). The rest are written when you click *Write answers* on the job page (`applications.answers: on-demand`), or while preparing (`auto`).
 - **Batch API for writing** (`llm.batchWriting: true`): resumes and answers cost half, and arrive in minutes instead of seconds.
 

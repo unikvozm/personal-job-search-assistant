@@ -3,7 +3,7 @@
 Next.js 16 + TypeScript app with a CLI (`pnpm jobs <command>`) and a SQLite tracker (`data/tracker.sqlite`, Node's built-in `node:sqlite`).
 
 ## Privacy
-- `CV.md`, `interviewBankStories.md`, `configs.md`, `.env*` and `data/` are personal and gitignored; a pre-commit hook blocks them. Never commit them, never copy their content into tracked files, issues or examples. Examples use the fictional "Alex Example".
+- `CV.md`, `cvs/`, `interviewBankStories.md`, `configs.md`, `.env*`, `personal/` and `data/` are personal and gitignored; a pre-commit hook blocks them. Never commit them, never copy their content into tracked files, issues or examples. Examples use the fictional "Alex Example".
 
 ## Keep token use low
 - Job fetching, dedupe, filtering, link checks and form filling are plain scripts. Don't do them by hand with web search or the browser.

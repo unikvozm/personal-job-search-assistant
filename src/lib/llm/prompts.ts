@@ -68,7 +68,8 @@ export const ScoreSchema = z.object({
   roleFamily: z.string().describe("the candidate role family from <facts> closest to this job, or an empty string"),
 });
 
-export const SCORE_SYSTEM = `You are a strict technical recruiter. Compare the candidate (CV and facts in <candidate>) with one job posting and score the fit.
+export const SCORE_SYSTEM = `You are a strict technical recruiter. Compare the candidate (in <candidate>) with one job posting and score the fit.
+The candidate is described either by one CV, or by several ready CVs (one per role family) in <ready_cvs>. With ready CVs, score the job against the ready CV that fits it best and return that CV's family as roleFamily.
 
 Scoring rules:
 - Judge only on evidence in the CV. Never assume skills or experience that are not written there.
@@ -82,6 +83,16 @@ Keep all text fields short.`;
 
 export function scorePrompt(job: Job): string {
   return `Score this job for the candidate.\n\n${jobBlock(job)}`;
+}
+
+/**
+ * Scoring context: the ready CVs (cvs/*.md) when you have them - jobs are matched against the
+ * resumes you will actually send - otherwise the master CV.
+ */
+export function scoringContext(cv: string, config: Config, ready: { family: string; markdown: string }[]): string {
+  if (!ready.length) return candidateContext(cv, config);
+  const cvs = ready.map((r) => `<cv family="${r.family}">\n${r.markdown}\n</cv>`).join("\n");
+  return `<candidate>\n<ready_cvs>\n${cvs}\n</ready_cvs>\n<facts>\n${candidateFacts(config)}\nRole families: ${ready.map((r) => r.family).join(", ")}\n</facts>\n</candidate>`;
 }
 
 export function candidateContext(cv: string, config: Config): string {

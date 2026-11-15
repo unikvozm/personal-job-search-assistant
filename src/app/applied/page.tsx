@@ -1,10 +1,13 @@
 import path from "node:path";
 import { APPLIED_STATUSES, applicationsRepo, jobsRepo } from "@/lib/db";
 import { TrackerTable, type TrackerRow } from "../components/TrackerTable";
+import { resumeFileFor } from "@/lib/resume/readyCvs";
+import { tryConfig } from "@/lib/server";
 
 export const dynamic = "force-dynamic";
 
 export default function AppliedPage() {
+  const { config } = tryConfig();
   const applied = new Set<string>(APPLIED_STATUSES);
   const rows: TrackerRow[] = applicationsRepo.all().flatMap((app) => {
     const job = jobsRepo.get(app.jobId);
@@ -20,7 +23,7 @@ export default function AppliedPage() {
       followUpAt: app.followUpAt?.slice(0, 10) ?? "",
       interviewAt: app.interviewAt?.slice(0, 16) ?? "",
       notes: app.notes,
-      resumePdf: app.resumeDir ? path.join(app.resumeDir, "resume.pdf") : null,
+      resumePdf: config ? resumeFileFor(job, app.resumeDir, config) : null,
     }];
   });
   const today = new Date().toISOString().slice(0, 10);

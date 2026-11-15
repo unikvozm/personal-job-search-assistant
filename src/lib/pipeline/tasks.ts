@@ -22,7 +22,7 @@ import {
 export const cvAndStories = (cv: string, stories: string) =>
   `<candidate>\n<cv>\n${cv}\n</cv>\n<stories>\n${stories}\n</stories>\n</candidate>`;
 
-/** One resume per role family, written once and reused for every job of that family below tailorMinScore. */
+/** Drafts a ready CV for a role family (`pnpm jobs cvs --generate`, once; you edit it afterwards). */
 export const familyTask = (family: string, cv: string, config: Config): LlmTask<z.infer<typeof TailorSchema>> => ({
   id: `family-${family}`,
   step: "tailor",

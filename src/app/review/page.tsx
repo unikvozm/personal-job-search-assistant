@@ -2,6 +2,8 @@ import fs from "node:fs";
 import path from "node:path";
 import { applicationsRepo, jobsRepo } from "@/lib/db";
 import { formUrl } from "@/lib/apply/prefill";
+import { resumeFileFor } from "@/lib/resume/readyCvs";
+import { tryConfig } from "@/lib/server";
 import { ReviewQueue, type ReviewItem } from "../components/ReviewQueue";
 
 export const dynamic = "force-dynamic";
@@ -9,6 +11,7 @@ export const dynamic = "force-dynamic";
 const read = (file: string) => (fs.existsSync(file) ? fs.readFileSync(file, "utf8") : "");
 
 export default function ReviewPage() {
+  const { config } = tryConfig();
   const items: ReviewItem[] = applicationsRepo.byStatus("prefilled", "needs_manual").flatMap((app) => {
     const job = jobsRepo.get(app.jobId);
     if (!job) return [];
@@ -20,7 +23,7 @@ export default function ReviewPage() {
       company: job.company,
       url: formUrl(job),
       score: job.score ?? 0,
-      resumePdf: dir ? path.join(dir, "resume.pdf") : null,
+      resumePdf: config ? resumeFileFor(job, dir || null, config) : null,
       changes: dir ? read(path.join(dir, "changes.md")) : "",
       screenshot: app.screenshot,
       missing: app.missingFields ?? [],

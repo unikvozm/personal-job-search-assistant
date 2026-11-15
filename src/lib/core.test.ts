@@ -367,26 +367,34 @@ describe("cost-saving preparation", () => {
     expect(reusableAnswer("Describe a conflict with a colleague", "Globex", saved)).toBeNull();
   });
 
-  it("plans family resumes once, per-job resumes for top scores, and answers only on demand", async () => {
+  it("uses ready CVs without Claude, and writes resumes or answers only when asked", async () => {
     const fsMod = await import("node:fs");
     const os = await import("node:os");
     const pathMod = await import("node:path");
     resetDb(":memory:");
     const { paths } = await import("./paths");
     const tmp = fsMod.mkdtempSync(pathMod.join(os.tmpdir(), "jsa-"));
-    const p = paths as { cv: string; stories: string; resumes: string };
+    const p = paths as { cv: string; stories: string; resumes: string; cvs: string };
     p.cv = pathMod.resolve("CV.example.md");
     p.stories = pathMod.join(tmp, "stories.md");
     p.resumes = pathMod.join(tmp, "resumes");
+    p.cvs = pathMod.join(tmp, "cvs");
     fsMod.writeFileSync(p.stories, "# Bank\n");
+    fsMod.mkdirSync(p.cvs);
+    fsMod.writeFileSync(pathMod.join(p.cvs, "frontend-platform.md"), "# Alex Example\n");
+    fsMod.writeFileSync(pathMod.join(p.cvs, "developer-experience.md"), "# Alex Example\n");
+
+    const { readyCvFor, readyCvs } = await import("./resume/readyCvs");
+    expect(readyCvs(config).map((c) => c.name)).toEqual(["Alex_Example_CV_Developer_Experience", "Alex_Example_CV_Frontend_Platform"]);
+    expect(readyCvFor(job({ title: "Developer Experience Engineer" }), config)!.family).toBe("developer-experience");
+
     const { prepareTasks } = await import("./pipeline/prepare");
     const qs = [{ id: "q1", label: "Why us?", required: true, type: "textarea" as const }];
-    const top = job({ id: "top", fingerprint: "top", score: 92, questions: qs });
-    const midA = job({ id: "midA", fingerprint: "midA", title: "Senior Frontend Engineer", score: 76, questions: qs });
-    const midB = job({ id: "midB", fingerprint: "midB", title: "Frontend Platform Engineer", score: 78, questions: qs });
-    const ids = (opts = {}) => prepareTasks([top, midA, midB], config, opts).map((t) => t.id).sort();
-    expect(ids()).toEqual(["family-frontend-platform", "tailor-top"]);
-    expect(ids({ writeAnswers: true })).toEqual(["answers-midA", "answers-midB", "answers-top", "family-frontend-platform", "tailor-top"]);
-    expect(ids({ tailor: true })).toEqual(["tailor-midA", "tailor-midB", "tailor-top"]);
+    const top = job({ id: "top", fingerprint: "top", score: 95, questions: qs });
+    const mid = job({ id: "mid", fingerprint: "mid", score: 76, questions: qs });
+    const ids = (opts = {}) => prepareTasks([top, mid], config, opts).map((t) => t.id).sort();
+    expect(ids()).toEqual([]); // ready CVs, answers on demand: no Claude calls, even for a 95 score
+    expect(ids({ writeAnswers: true })).toEqual(["answers-mid", "answers-top"]);
+    expect(ids({ tailor: true })).toEqual(["tailor-mid", "tailor-top"]);
   });
 });

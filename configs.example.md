@@ -71,6 +71,5 @@ tracker:
   followUpDays: 7
 
 applications:
-  tailorMinScore: 85          # 85+ gets a resume tailored to the posting; lower scores use the role-family resume
   answers: on-demand          # on-demand: click "Write answers" on the job page | auto: write them while preparing
 ```
