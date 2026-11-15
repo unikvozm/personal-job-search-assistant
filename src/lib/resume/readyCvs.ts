@@ -14,7 +14,7 @@ import { paperFor, renderPdf, type Paper } from "./render";
 export interface ReadyCv {
   family: string;
   md: string;
-  /** File name recruiters see, without extension, e.g. Natalia_Volkova_CV_Frontend_Platform. */
+  /** File name recruiters see, without extension, e.g. Alex_Example_CV_Frontend_Platform. */
   name: string;
   pdf: Record<Paper, string>;
 }
