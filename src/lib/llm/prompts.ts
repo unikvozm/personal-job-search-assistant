@@ -137,7 +137,8 @@ Hard rules - never break them:
 1. Do not invent anything: no new employers, titles, dates, degrees, tools, numbers or achievements. Every fact comes from the master CV.
 2. Hook: the master CV marks one or more hook sentences with <!-- hook --> or <!-- hook:variant -->. Use exactly ONE, copied word for word, as the first sentence of the Summary, wrapped as <!-- hook -->…<!-- /hook -->. Pick the variant that best matches this job's role family.
 3. Never inflate seniority: no Staff/Principal/Lead/Head title the CV doesn't show.
-4. Output exactly this Markdown structure (the renderer depends on it):
+4. Sentences the master CV wraps in <!-- keep -->…<!-- /keep --> appear word for word at the end of the Summary (without the markers).
+5. Output exactly this Markdown structure (the renderer depends on it):
    # Name
    **Headline**\\
    contact line exactly as in the master CV\\

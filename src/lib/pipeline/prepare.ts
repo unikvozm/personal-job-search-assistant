@@ -12,7 +12,7 @@ import type { AnswersSchema, TailorSchema } from "../llm/prompts";
 import { ensureDir, paths, slugify } from "../paths";
 import { resumeSource } from "../resume/families";
 import { readyCvFor, readyCvPdf, readyCvs, renderReadyCvs, resumeFileFor, useReadyCv } from "../resume/readyCvs";
-import { hooksOf, newNumbers, paperFor, renderPdf } from "../resume/render";
+import { hooksOf, keptSentences, newNumbers, paperFor, renderPdf } from "../resume/render";
 import { loadStories, reusableAnswer, savedAnswers } from "../stories";
 import type { StepOptions } from "./score";
 import { answersTask, customQuestions, cvAndStories, familyTask, tailorTask } from "./tasks";
@@ -188,6 +188,8 @@ async function writeTailoredResume(job: Job, cv: string, config: Config, dir: st
   const warnings: string[] = [];
   const hooks = hooksOf(cv);
   if (hooks.length && !hooks.some((h) => out.markdown.includes(h.text))) warnings.push("The hook sentence was changed - check the summary.");
+  const dropped = keptSentences(cv).filter((k) => !out.markdown.includes(k));
+  if (dropped.length) warnings.push(`Missing sentence(s) you marked to keep: ${dropped.join(" / ")}`);
   const invented = newNumbers(cv, out.markdown);
   if (invented.length) warnings.push(`Numbers not found in CV.md: ${invented.join(", ")} - verify or remove.`);
   fs.writeFileSync(path.join(dir, "resume.md"), out.markdown);

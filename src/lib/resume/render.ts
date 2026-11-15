@@ -156,6 +156,11 @@ export function hooksOf(markdown: string): { variant: string | null; text: strin
   return [...markdown.matchAll(HOOK)].map((m) => ({ variant: m[1] ?? null, text: m[2]!.trim() }));
 }
 
+/** Sentences marked <!-- keep -->…<!-- /keep --> in CV.md: every tailored resume must contain them verbatim. */
+export function keptSentences(markdown: string): string[] {
+  return [...markdown.matchAll(/<!--\s*keep\s*-->([\s\S]*?)<!--\s*\/keep\s*-->/g)].map((m) => m[1]!.trim());
+}
+
 export function hookOf(markdown: string): string | null {
   return hooksOf(markdown)[0]?.text ?? null;
 }

@@ -10,7 +10,7 @@ import { groupJobs, postedWithin } from "./jobs/sort";
 import type { Job, RawJob } from "./jobs/types";
 import { BudgetError, assertBudget, recordSpend } from "./llm/cost";
 import { searchWindow } from "./pipeline/find";
-import { hookOf, hooksOf, newNumbers, resumeBody } from "./resume/render";
+import { hookOf, hooksOf, keptSentences, newNumbers, resumeBody } from "./resume/render";
 import { countriesFrom } from "./sources/geo";
 import { nextStoryId, parseStories } from "./stories";
 import { toIcs } from "./tracker/ics";
@@ -204,6 +204,9 @@ describe("resume checks", () => {
     expect(html).toContain('<section class="sec-skills">');
     expect(html).toContain("<strong>Languages</strong>"); // colon removed in skill labels
     expect(html).toContain('<div class="header">');
+  });
+  it("finds sentences marked to keep", () => {
+    expect(keptSentences("A <!-- keep -->Former tutor of 26+ subjects.<!-- /keep --> B")).toEqual(["Former tutor of 26+ subjects."]);
   });
   it("flags numbers that are not in the CV", () => {
     expect(newNumbers(cv, "Cut load time by 45% and grew revenue 300%")).toEqual(["300%"]);

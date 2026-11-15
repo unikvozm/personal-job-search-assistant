@@ -25,7 +25,7 @@ pnpm exec playwright install chromium    # PDFs, form reading, prefill
 
 1. **configs.md**: fill in the YAML block. `search.countries` (ISO codes, or `REMOTE`) and `search.titles` are required; the countries decide which boards are searched. Add 20–50 `targetCompanies` (their Greenhouse/Lever/Ashby/SmartRecruiters board slug) for the best results.
 2. **cvs/** (optional but recommended): one ready, one-page CV per role family, e.g. `cvs/frontend-platform.md`, in the same Markdown format. These are what you send.
-3. **CV.md**: your full master CV in Markdown (it can be longer than a page; every tailored resume is cut to one page). Wrap your hook sentence in `<!-- hook -->…<!-- /hook -->`, or add one variant per role family as `<!-- hook:name -->…<!-- /hook -->`; tailoring picks one and never rewords it. The layout (gold and dark grey, single column, ATS-friendly) and the Markdown structure it expects are described at the top of `src/lib/resume/render.ts`.
+3. **CV.md**: your full master CV in Markdown (it can be longer than a page; every tailored resume is cut to one page). Wrap your hook sentence in `<!-- hook -->…<!-- /hook -->`, or add one variant per role family as `<!-- hook:name -->…<!-- /hook -->`; tailoring picks one and never rewords it. Wrap any other sentence that must appear in every tailored resume in `<!-- keep -->…<!-- /keep -->`. The layout (gold and dark grey, single column, ATS-friendly) and the Markdown structure it expects are described at the top of `src/lib/resume/render.ts`.
 3. **interviewBankStories.md**: your STAR stories (`## S01 — Title`, `Tags:`, Situation/Task/Action/Result).
 4. **.env.local**: `ANTHROPIC_API_KEY` for API mode; optionally a free [Adzuna](https://developer.adzuna.com) key for national job boards.
 
